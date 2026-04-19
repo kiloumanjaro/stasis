@@ -12,7 +12,6 @@ export async function middleware(request: NextRequest) {
   const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   // DEV: auth disabled — real getUser() call suppressed; mock user injected via server client
-  let user = null;
   if (process.env.SKIP_AUTH !== 'true' && SUPABASE_URL && SUPABASE_ANON_KEY) {
     const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       cookies: {
@@ -28,8 +27,7 @@ export async function middleware(request: NextRequest) {
       },
     });
 
-    const { data } = await supabase.auth.getUser();
-    user = data?.user;
+    await supabase.auth.getUser();
   }
 
   // Skip auth check for callback and auth pages
