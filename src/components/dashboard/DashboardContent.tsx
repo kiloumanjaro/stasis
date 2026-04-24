@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import Image from 'next/image';
 import {
   Card,
   CardContent,
@@ -8,6 +7,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { FeatureFooterCard } from '@/components/FeatureFooterCard';
 import { Icon } from '@iconify/react';
 
 // Bootstrap icon names for Iconify
@@ -91,49 +91,24 @@ export function DashboardContent() {
       </Card>
 
       {/* Recent Activity */}
-      <Card className="border-none bg-[#0f0f0f] px-4 py-2">
-        <CardHeader>
-          <div className="flex flex-row justify-between">
-            <div className="flex w-1/2 items-center">
-              <Image
-                src="/images/green.png"
-                alt="Stasis"
-                className="h-12 w-12"
-                width={48}
-                height={48}
-              />
-              <CardTitle className="text-3xl font-normal">statis</CardTitle>
-            </div>
-            <div className="flex w-1/2 flex-col gap-2">
-              <CardTitle className="font-normal">Recent Activity</CardTitle>
-              <CardDescription>
-                Your learning history will appear here
-              </CardDescription>
-            </div>
+      <FeatureFooterCard
+        title="Recent Activity"
+        description="Your learning history will appear here"
+        leftContent={
+          <p className="ml-3 max-w-md">
+            Track your study sessions and progress here. Your recent flashcard
+            reviews and learning milestones will be displayed.
+          </p>
+        }
+        rightContent={
+          <div className="flex h-full flex-col items-center justify-center py-12 text-center">
+            <BookOpenIcon className="mb-4 h-12 w-12 text-muted-foreground/50" />
+            <p className="text-sm text-muted-foreground">
+              No activity yet. Start by uploading your first study material!
+            </p>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-row justify-between">
-            {/* Left Column: Info */}
-            <div className="flex w-1/2 flex-col justify-between space-y-2 pb-3 text-sm text-muted-foreground">
-              <p className="ml-3 max-w-md">
-                Track your study sessions and progress here. Your recent
-                flashcard reviews and learning milestones will be displayed.
-              </p>
-            </div>
-
-            {/* Right Column: Activity Area */}
-            <div className="flex flex-1 flex-col overflow-hidden rounded-lg border border-[#4a4a46]/50 bg-[#191919]">
-              <div className="flex h-full flex-col items-center justify-center py-12 text-center">
-                <BookOpenIcon className="mb-4 h-12 w-12 text-muted-foreground/50" />
-                <p className="text-sm text-muted-foreground">
-                  No activity yet. Start by uploading your first study material!
-                </p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        }
+      />
     </div>
   );
 }

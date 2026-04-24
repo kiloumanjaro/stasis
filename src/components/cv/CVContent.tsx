@@ -2,16 +2,10 @@
 
 import { useRef, useEffect, useState, useCallback } from 'react';
 import * as faceapi from 'face-api.js';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Camera, CameraOff, Loader2 } from 'lucide-react';
-import Image from 'next/image';
+import { FeatureFooterCard } from '@/components/FeatureFooterCard';
 
 interface EmotionData {
   neutral: number;
@@ -309,52 +303,28 @@ export function CVContent() {
         </Card>
       </div>
 
-      <Card className="mt-6 border-none bg-[#0f0f0f] px-4 py-2">
-        <CardHeader>
-          <div className="flex flex-row justify-between">
-            <div className="flex w-1/2 items-center">
-              <Image
-                src="/images/green.png"
-                alt="Stasis"
-                className="h-12 w-12"
-                width={48}
-                height={48}
-              />
-              <CardTitle className="text-3xl font-normal">statis</CardTitle>
-            </div>
-            <div className="flex w-1/2 flex-col gap-2">
-              <CardTitle className="font-normal">How it works</CardTitle>
-              <CardDescription>
-                The technology used for this product is indicated here
-              </CardDescription>
-            </div>
+      <FeatureFooterCard
+        title="How it works"
+        description="The technology used for this product is indicated here"
+        className="mt-6"
+        leftContent={
+          <p className="ml-3 max-w-md">
+            This application processes webcam images locally in your browser for
+            real-time emotion analysis only. No images or video are stored,
+            saved, or transmitted to any server at any time.
+          </p>
+        }
+        rightContent={
+          <div className="flex h-full flex-col items-center justify-center px-10 py-12 text-center">
+            <p className="text-sm text-muted-foreground">
+              This demo uses <strong>face-api.js</strong>, a JavaScript face
+              recognition library built on top of TensorFlow.js. It detects
+              faces in real-time from your webcam feed and analyzes facial
+              expressions to determine emotions.
+            </p>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-row justify-between">
-            {/* Left Column: Info */}
-            <div className="flex w-1/2 flex-col justify-between space-y-2 pb-3 text-sm text-muted-foreground">
-              <p className="ml-3 max-w-md">
-                This application processes webcam images locally in your browser
-                for real-time emotion analysis only. No images or video are
-                stored, saved, or transmitted to any server at any time.
-              </p>
-            </div>
-
-            {/* Right Column: Activity Area */}
-            <div className="flex flex-1 flex-col overflow-hidden rounded-lg border border-[#4a4a46]/50 bg-[#191919]">
-              <div className="flex h-full flex-col items-center justify-center px-10 py-12 text-center">
-                <p className="text-sm text-muted-foreground">
-                  This demo uses <strong>face-api.js</strong>, a JavaScript face
-                  recognition library built on top of TensorFlow.js. It detects
-                  faces in real-time from your webcam feed and analyzes facial
-                  expressions to determine emotions.
-                </p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        }
+      />
     </div>
   );
 }
