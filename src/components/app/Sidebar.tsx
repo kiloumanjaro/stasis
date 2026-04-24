@@ -12,6 +12,7 @@ import {
   Menu,
   X,
   Scan,
+  Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,7 @@ const navItems = [
   { href: '/roadmap', label: 'Roadmap', icon: Map },
   { href: '/pomodoro', label: 'Pomodoro', icon: Timer },
   { href: '/cv', label: 'Emotion AI', icon: Scan },
+  { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
 interface SidebarProps {

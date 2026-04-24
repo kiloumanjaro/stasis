@@ -68,6 +68,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       if (user) {
         checkOnboarding();
       } else {
+        router.replace('/auth/sign-up');
         setLoading(false);
       }
     });
@@ -79,6 +80,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       if (session?.user) {
         checkOnboarding();
       } else {
+        router.replace('/auth/sign-up');
         setLoading(false);
       }
     });
@@ -89,12 +91,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="text-center">
-          <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-gray-900 dark:border-gray-600 dark:border-t-gray-100"></div>
+        <div className="flex flex-col items-center justify-center gap-3 text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-gray-900 dark:border-gray-600 dark:border-t-gray-100"></div>
           <p className="text-sm text-gray-600 dark:text-gray-400">Loading...</p>
         </div>
       </div>
     );
+  }
+
+  if (!user && process.env.NEXT_PUBLIC_SKIP_AUTH !== 'true') {
+    return null;
   }
 
   return (
