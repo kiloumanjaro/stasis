@@ -14,6 +14,7 @@ import {
   Target,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useCameraContextSafe } from '@/features/camera/context/CameraContext';
 
 type TimerMode = 'focus' | 'shortBreak' | 'longBreak';
 
@@ -106,6 +107,18 @@ export function TimerWidget() {
   });
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Camera streams during focus only, not during breaks.
+  const camera = useCameraContextSafe();
+  useEffect(() => {
+    camera?.setSessionActive(isRunning && mode === 'focus');
+  }, [isRunning, mode, camera]);
+
+  useEffect(() => {
+    return () => {
+      camera?.setSessionActive(false);
+    };
+  }, [camera]);
 
   // Persist state to module-level variable
   useEffect(() => {
@@ -344,7 +357,7 @@ export function TimerWidget() {
         <Button
           variant="outline"
           size="icon"
-          className="h-10 w-10 rounded-full"
+          className="h-11 w-11 rounded-full"
           onClick={handleReset}
           title="Reset"
         >
@@ -374,7 +387,7 @@ export function TimerWidget() {
         <Button
           variant="outline"
           size="icon"
-          className={cn('h-10 w-10 rounded-full', showSettings && 'bg-accent')}
+          className={cn('h-11 w-11 rounded-full', showSettings && 'bg-accent')}
           onClick={() => setShowSettings(!showSettings)}
           title="Settings"
         >
