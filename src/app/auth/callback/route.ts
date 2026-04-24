@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
           .limit(1);
 
         // If user doesn't have preferences, redirect to preferences page
-        const redirectPath = prefs.length === 0 ? '/preferences' : next;
+        const redirectPath = prefs.length === 0 ? '/onboarding/welcome' : next;
 
         response = NextResponse.redirect(`${origin}${redirectPath}`);
         return response;
