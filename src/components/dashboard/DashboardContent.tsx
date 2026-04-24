@@ -1,5 +1,3 @@
-'use client';
-
 import Link from 'next/link';
 import Image from 'next/image';
 import {
@@ -50,11 +48,6 @@ const stats = [
 export function DashboardContent() {
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl">Learning Overview</h1>
-      </div>
-
       {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-3">
         {stats.map((stat) => (
