@@ -1,9 +1,20 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+
 import type { DailyStats } from '@/lib/dashboard';
 
 interface UserGreetingProps {
   displayName: string;
   dailyStats: DailyStats | null;
 }
+
+const SAME_DAY_VISIT_STORAGE_KEY = 'stasis-dashboard-visit-tracker';
+
+type VisitTracker = {
+  date: string;
+  count: number;
+};
 
 function getSalutation(date: Date = new Date()): string {
   const hour = date.getHours();
@@ -33,6 +44,70 @@ function truncateForMobile(displayName: string): string {
   return `${displayName.slice(0, maxLength - 3)}...`;
 }
 
+function getTodayKey(date: Date = new Date()): string {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+function readVisitTracker(): VisitTracker | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const rawValue = window.localStorage.getItem(SAME_DAY_VISIT_STORAGE_KEY);
+  if (!rawValue) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(rawValue) as Partial<VisitTracker>;
+    if (
+      typeof parsed.date === 'string' &&
+      typeof parsed.count === 'number' &&
+      Number.isFinite(parsed.count)
+    ) {
+      return {
+        date: parsed.date,
+        count: parsed.count,
+      };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function trackSameDayVisit(): number {
+  if (typeof window === 'undefined') {
+    return 1;
+  }
+
+  const today = getTodayKey();
+  const existingTracker = readVisitTracker();
+
+  const nextTracker: VisitTracker =
+    existingTracker?.date === today
+      ? {
+          date: today,
+          count: existingTracker.count + 1,
+        }
+      : {
+          date: today,
+          count: 1,
+        };
+
+  window.localStorage.setItem(
+    SAME_DAY_VISIT_STORAGE_KEY,
+    JSON.stringify(nextTracker)
+  );
+
+  return nextTracker.count;
+}
+
 function getContextLine(dailyStats: DailyStats | null): string {
   if (dailyStats?.dailyCardGoalMet && dailyStats.cardsReviewed > 0) {
     return `Goal hit. You've reviewed all ${dailyStats.cardsReviewed} cards for today.`;
@@ -54,15 +129,22 @@ function getContextLine(dailyStats: DailyStats | null): string {
 }
 
 export function UserGreeting({ displayName, dailyStats }: UserGreetingProps) {
+  const [visitCount, setVisitCount] = useState(1);
+
+  useEffect(() => {
+    setVisitCount(trackSameDayVisit());
+  }, []);
+
   const salutation = getSalutation();
+  const headingLead = visitCount > 1 ? 'Welcome back' : salutation;
   const mobileDisplayName = truncateForMobile(displayName);
   const contextLine = getContextLine(dailyStats);
 
   return (
     <section className="flex min-h-[72px] flex-col justify-center gap-1 rounded-2xl border border-border/60 bg-background/20 px-4 py-4 sm:min-h-[80px] sm:px-6">
       <h1 className="text-2xl font-semibold tracking-tight">
-        <span className="sm:hidden">{`${salutation}, ${mobileDisplayName}`}</span>
-        <span className="hidden sm:inline">{`${salutation}, ${displayName}`}</span>
+        <span className="sm:hidden">{`${headingLead}, ${mobileDisplayName}`}</span>
+        <span className="hidden sm:inline">{`${headingLead}, ${displayName}`}</span>
       </h1>
       <p className="text-sm text-muted-foreground">{contextLine}</p>
     </section>
