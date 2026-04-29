@@ -66,6 +66,64 @@ const DEFAULT_SETTINGS: SettingsDefaults = {
 
 const REMINDER_TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
+function hasConfiguredSupabaseConnection(): boolean {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+
+  if (!url || !anonKey) {
+    return false;
+  }
+
+  const invalidValues = new Set([
+    'your-supabase-project-url',
+    'your-supabase-anon-key',
+    'mock-anon-key',
+  ]);
+
+  return !invalidValues.has(url.toLowerCase()) && !invalidValues.has(anonKey);
+}
+
+function normalizeDisplayName(value: string | null | undefined): string {
+  return (value ?? '').trim().slice(0, 40);
+}
+
+async function syncDisplayName(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  user: { id: string; email?: string | null },
+  displayName: string | null | undefined
+) {
+  const trimmed = normalizeDisplayName(displayName);
+  const normalized = trimmed.length > 0 ? trimmed : null;
+
+  const { error: legacyError } = await supabase.from('profiles').upsert(
+    {
+      id: user.id,
+      full_name: normalized,
+      email: user.email ?? null,
+    },
+    { onConflict: 'id' }
+  );
+
+  if (legacyError) {
+    console.error('Failed to update legacy profile display name:', legacyError);
+  }
+
+  const { error: metadataError } = await supabase.auth.updateUser({
+    data: {
+      name: normalized,
+      full_name: normalized,
+      display_name: normalized,
+    },
+  });
+
+  if (metadataError) {
+    console.error(
+      'Failed to update auth metadata display name:',
+      metadataError
+    );
+  }
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
@@ -202,6 +260,15 @@ export async function getSettingsProfile() {
     };
   }
 
+  if (!hasConfiguredSupabaseConnection()) {
+    return {
+      ok: true,
+      reason: null as SettingsErrorReason | null,
+      message: null,
+      profile: buildDefaultProfileForUser(user),
+    };
+  }
+
   const { data, error: profileError } = await fetchUserProfileRow(
     supabase,
     user.id
@@ -243,6 +310,13 @@ export async function saveSettingsProfile(input: SettingsProfile) {
     return { ok: false, message: error };
   }
 
+  if (!hasConfiguredSupabaseConnection()) {
+    return {
+      ok: false,
+      message: 'Settings storage is unavailable. Configure Supabase to save.',
+    };
+  }
+
   const { data: existingData, error: existingError } =
     await fetchUserProfileRow(supabase, user.id);
 
@@ -280,7 +354,12 @@ export async function saveSettingsProfile(input: SettingsProfile) {
     return { ok: false, message: upsertError.message };
   }
 
+  await syncDisplayName(supabase, user, normalized.display_name);
+
   revalidatePath('/settings');
+  revalidatePath('/dashboard');
+  revalidatePath('/profile');
+  revalidatePath('/pomodoro');
 
   return {
     ok: true,
@@ -289,12 +368,19 @@ export async function saveSettingsProfile(input: SettingsProfile) {
 }
 
 export async function updateDisplayNameAction(displayName: string) {
-  const trimmed = (displayName ?? '').trim().slice(0, 40);
+  const trimmed = normalizeDisplayName(displayName);
 
   const { supabase, user, error } = await getAuthenticatedUser();
 
   if (!user || error) {
     return { ok: false, message: error };
+  }
+
+  if (!hasConfiguredSupabaseConnection()) {
+    return {
+      ok: false,
+      message: 'Settings storage is unavailable. Configure Supabase to save.',
+    };
   }
 
   const { error: upsertError } = await supabase.from('user_profiles').upsert(
@@ -310,7 +396,12 @@ export async function updateDisplayNameAction(displayName: string) {
     return { ok: false, message: upsertError.message };
   }
 
+  await syncDisplayName(supabase, user, trimmed);
+
   revalidatePath('/settings');
+  revalidatePath('/dashboard');
+  revalidatePath('/profile');
+  revalidatePath('/pomodoro');
 
   return { ok: true, message: 'Display name updated.' };
 }
