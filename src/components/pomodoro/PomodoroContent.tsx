@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { getAppShellViewportInsets } from '@/lib/app-shell';
 import {
   AddFlashcardsWidget,
   CameraWidget,
@@ -46,6 +47,7 @@ export function PomodoroContent({
   const [activeWidget, setActiveWidget] = useState<WidgetType | null>(
     initialCvMonitoringEnabled ? 'monitor' : null
   );
+  const [shellLeftInset, setShellLeftInset] = useState(0);
   const [timerInitialX, setTimerInitialX] = useState(0);
   const [monitorInitialX, setMonitorInitialX] = useState(0);
 
@@ -101,11 +103,20 @@ export function PomodoroContent({
 
   // Calculate widget initial positions on mount
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setTimerInitialX(window.innerWidth - 360);
+    if (typeof window === 'undefined') return;
+
+    const syncWidgetPositions = () => {
+      const { left } = getAppShellViewportInsets();
+      setShellLeftInset(left);
+      setTimerInitialX(Math.max(left + 20, window.innerWidth - 360));
       // Position monitor to the left of timer
-      setMonitorInitialX(window.innerWidth - 720);
-    }
+      setMonitorInitialX(Math.max(left + 20, window.innerWidth - 720));
+    };
+
+    syncWidgetPositions();
+    window.addEventListener('resize', syncWidgetPositions);
+
+    return () => window.removeEventListener('resize', syncWidgetPositions);
   }, []);
 
   // Toggle widget visibility
@@ -166,6 +177,7 @@ export function PomodoroContent({
       <button
         onClick={() => toggleWidget('addFlashcards')}
         className="fixed bottom-8 right-8 z-50 rounded-full border border-[#4a4a46] bg-[#30302e] p-3 text-primary-foreground shadow-lg transition-transform hover:scale-105"
+        style={{ bottom: 'calc(var(--app-mobile-nav-height) + 2rem)' }}
         title="Add Flashcards"
       >
         <svg
@@ -189,7 +201,7 @@ export function PomodoroContent({
         isOpen={widgets.camera.isOpen}
         onMinimize={() => minimizeWidget('camera')}
         onFocus={() => focusWidget('camera')}
-        initialPosition={{ x: 20, y: 100 }}
+        initialPosition={{ x: shellLeftInset + 20, y: 100 }}
         title="Camera"
         zIndex={getZIndex('camera')}
         width={320}
@@ -234,7 +246,7 @@ export function PomodoroContent({
           setEditPayload(null);
         }}
         onFocus={() => focusWidget('addFlashcards')}
-        initialPosition={{ x: 300, y: 100 }}
+        initialPosition={{ x: Math.max(shellLeftInset + 40, 300), y: 100 }}
         title={editPayload ? 'Edit Flashcard Deck' : 'Add Flashcard Deck'}
         zIndex={getZIndex('addFlashcards')}
         width={500}
