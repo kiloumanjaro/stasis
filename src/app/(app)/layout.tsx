@@ -44,7 +44,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         router.replace('/auth/sign-up');
       }
     };
-
     void syncAuthState();
 
     return () => {
