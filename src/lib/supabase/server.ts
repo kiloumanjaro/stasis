@@ -16,6 +16,9 @@ const DEV_MOCK_USER = {
 
 export async function createClient() {
   const cookieStore = await cookies();
+  const isAuthBypassed =
+    process.env.SKIP_AUTH === 'true' ||
+    process.env.NEXT_PUBLIC_SKIP_AUTH === 'true';
 
   const client = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://localhost:54321',
@@ -39,8 +42,8 @@ export async function createClient() {
   );
 
   // DEV: auth disabled — shadow auth methods with mock implementations
-  if (process.env.SKIP_AUTH === 'true') {
-    const auth = client.auth as Record<string, unknown>;
+  if (isAuthBypassed) {
+    const auth = client.auth as unknown as Record<string, unknown>;
     auth.getUser = async () => ({ data: { user: DEV_MOCK_USER }, error: null });
     auth.getClaims = async () => ({
       data: {
