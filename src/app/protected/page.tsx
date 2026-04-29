@@ -1,17 +1,20 @@
 import { redirect } from 'next/navigation';
 
-import { createClient } from '@/lib/supabase/server';
+import { cookies } from 'next/headers';
+
+import { getBackendUser } from '@/lib/backend-auth';
 import { InfoIcon } from 'lucide-react';
 import { Suspense } from 'react';
 
 async function UserDetails() {
-  // Skip authentication if SKIP_AUTH environment variable is set to 'true'
   if (process.env.SKIP_AUTH === 'true') {
     return JSON.stringify(
       {
-        sub: 'demo-user',
+        id: 'demo-user',
+        userId: 'demo-user',
         email: 'demo@example.com',
-        role: 'authenticated',
+        name: 'Demo User',
+        pictureUrl: '',
         note: 'Auth bypassed - mock user data',
       },
       null,
@@ -19,14 +22,18 @@ async function UserDetails() {
     );
   }
 
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.getClaims();
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore
+    .getAll()
+    .map(({ name, value }) => `${name}=${value}`)
+    .join('; ');
+  const user = await getBackendUser(cookieHeader);
 
-  if (error || !data?.claims) {
-    redirect('/auth/login');
+  if (!user) {
+    redirect('/auth/sign-up');
   }
 
-  return JSON.stringify(data.claims, null, 2);
+  return JSON.stringify(user, null, 2);
 }
 
 export default function ProtectedPage() {

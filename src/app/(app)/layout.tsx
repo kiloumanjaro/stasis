@@ -1,31 +1,25 @@
 'use client';
 
 import { Sidebar } from '@/components/app/Sidebar';
-import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import type { User } from '@supabase/supabase-js';
+import { getBackendUser, type BackendAuthUser } from '@/lib/backend-auth';
 
-// DEV: auth disabled — mock user injected client-side when NEXT_PUBLIC_SKIP_AUTH=true
-// Remove this constant and the SKIP_AUTH guard below to restore real auth.
 const DEV_MOCK_USER = {
   id: 'eb00d0b0-848e-4ffe-97b6-6903c829cf22',
+  userId: 'eb00d0b0-848e-4ffe-97b6-6903c829cf22',
   email: 'dev@localhost.dev',
-  role: 'authenticated',
-  aud: 'authenticated',
-  app_metadata: { provider: 'dev' },
-  user_metadata: { name: 'Dev User', avatar_url: null },
-  created_at: '2025-01-01T00:00:00.000Z',
-} as unknown as User;
+  name: 'Dev User',
+  pictureUrl: '',
+} as BackendAuthUser;
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<BackendAuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
 
   const checkOnboarding = useCallback(async () => {
-    // DEV: auth disabled — onboarding redirect suppressed; remove guard to restore
     if (process.env.NEXT_PUBLIC_SKIP_AUTH === 'true') {
       setLoading(false);
       return;
@@ -54,36 +48,37 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [pathname, router]);
 
   useEffect(() => {
-    // DEV: auth disabled — real Supabase session check bypassed; mock user used instead
     if (process.env.NEXT_PUBLIC_SKIP_AUTH === 'true') {
       setUser(DEV_MOCK_USER);
       setLoading(false);
       return;
     }
 
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUser(user);
+    let isMounted = true;
 
-      if (user) {
-        checkOnboarding();
-      } else {
-        setLoading(false);
+    const syncAuthState = async () => {
+      const currentUser = await getBackendUser();
+
+      if (!isMounted) {
+        return;
       }
-    });
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        checkOnboarding();
-      } else {
+      if (!currentUser) {
+        setUser(null);
         setLoading(false);
+        router.replace('/auth/sign-up');
+        return;
       }
-    });
 
-    return () => subscription.unsubscribe();
+      setUser(currentUser);
+      await checkOnboarding();
+    };
+
+    void syncAuthState();
+
+    return () => {
+      isMounted = false;
+    };
   }, [checkOnboarding]);
 
   if (loading) {
@@ -99,7 +94,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
-      {/* DEV: auth disabled — DEV MODE banner; remove when re-enabling auth */}
       {process.env.NEXT_PUBLIC_SKIP_AUTH === 'true' && (
         <div className="fixed bottom-0 left-0 right-0 z-50 bg-yellow-400 px-4 py-1 text-center text-xs font-bold text-yellow-900">
           ⚠ DEV MODE — Auth disabled · Mock user: {DEV_MOCK_USER.email}

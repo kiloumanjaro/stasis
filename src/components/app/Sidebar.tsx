@@ -16,7 +16,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
-import type { User } from '@supabase/supabase-js';
+import type { BackendAuthUser } from '@/lib/backend-auth';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -27,7 +27,7 @@ const navItems = [
 ];
 
 interface SidebarProps {
-  user: User | null;
+  user: BackendAuthUser | null;
 }
 
 export function Sidebar({ user }: SidebarProps) {
