@@ -14,6 +14,7 @@ import {
   Target,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useCameraContextSafe } from '@/features/camera/context/CameraContext';
 
 type TimerMode = 'focus' | 'shortBreak' | 'longBreak';
 
@@ -35,12 +36,11 @@ const DEFAULT_SETTINGS: TimerSettings = {
   sessionsBeforeLongBreak: 4,
 };
 
-// Module-level state to persist timer across component unmounts
 let persistedState: {
   settings: TimerSettings;
   mode: TimerMode;
-  endTime: number | null; // timestamp when timer should end
-  pausedTimeRemaining: number | null; // time remaining when paused
+  endTime: number | null;
+  pausedTimeRemaining: number | null;
   isRunning: boolean;
   currentSession: number;
   sessionsCompleted: number;
@@ -124,6 +124,22 @@ export function TimerWidget({ initialSettings }: TimerWidgetProps) {
   });
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Ref keeps the effect deps stable so a CameraProvider re-render doesn't
+  // toggle the stream off/on and flicker the feed.
+  const camera = useCameraContextSafe();
+  const cameraRef = useRef(camera);
+  cameraRef.current = camera;
+
+  useEffect(() => {
+    cameraRef.current?.setSessionActive(isRunning && mode === 'focus');
+  }, [isRunning, mode]);
+
+  useEffect(() => {
+    return () => {
+      cameraRef.current?.setSessionActive(false);
+    };
+  }, []);
 
   // Persist state to module-level variable
   useEffect(() => {
@@ -407,7 +423,7 @@ export function TimerWidget({ initialSettings }: TimerWidgetProps) {
         <Button
           variant="outline"
           size="icon"
-          className="h-10 w-10 rounded-full"
+          className="h-11 w-11 rounded-full"
           onClick={handleReset}
           title="Reset"
         >
@@ -437,7 +453,7 @@ export function TimerWidget({ initialSettings }: TimerWidgetProps) {
         <Button
           variant="outline"
           size="icon"
-          className={cn('h-10 w-10 rounded-full', showSettings && 'bg-accent')}
+          className={cn('h-11 w-11 rounded-full', showSettings && 'bg-accent')}
           onClick={() => setShowSettings(!showSettings)}
           title="Settings"
         >

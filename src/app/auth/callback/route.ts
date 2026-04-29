@@ -1,7 +1,4 @@
-import db from '@/database';
-import { userPreferences } from '@/database/schema';
 import { createServerClient } from '@supabase/ssr';
-import { eq } from 'drizzle-orm';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
@@ -41,24 +38,62 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${origin}/auth/error`);
     }
 
-    // Check if user has completed preferences
     const userId = data?.user?.id;
     if (userId) {
-      try {
-        const prefs = await db
-          .select()
-          .from(userPreferences)
-          .where(eq(userPreferences.userId, userId))
-          .limit(1);
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
 
-        // If user doesn't have preferences, redirect to preferences page
-        const redirectPath = prefs.length === 0 ? '/onboarding/welcome' : next;
+      if (apiBaseUrl) {
+        try {
+          const backendResponse = await fetch(
+            new URL('/auth/preferences-status', apiBaseUrl),
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ userId }),
+              cache: 'no-store',
+            }
+          );
 
-        response = NextResponse.redirect(`${origin}${redirectPath}`);
-        return response;
-      } catch (dbError) {
-        console.error('Database error checking preferences:', dbError);
+          if (backendResponse.ok) {
+            const payload = (await backendResponse.json()) as {
+              redirectPath?: string;
+            };
+
+            response = NextResponse.redirect(
+              `${origin}${payload.redirectPath ?? next}`
+            );
+            return response;
+          }
+
+          console.error(
+            'Backend API error checking auth redirect:',
+            backendResponse.status,
+            await backendResponse.text()
+          );
+        } catch (apiError) {
+          console.error('Backend API error checking auth redirect:', apiError);
+        }
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('onboarding_completed')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (profileError) {
+        console.error(
+          'Supabase error checking onboarding status:',
+          profileError
+        );
         response = NextResponse.redirect(`${origin}${next}`);
+        return response;
+      }
+
+      if (!profile?.onboarding_completed) {
+        response = NextResponse.redirect(`${origin}/onboarding/welcome`);
         return response;
       }
     }

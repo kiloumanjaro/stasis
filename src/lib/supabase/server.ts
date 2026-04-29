@@ -14,6 +14,31 @@ const DEV_MOCK_USER = {
   created_at: '2025-01-01T00:00:00.000Z',
 };
 
+const DEV_MOCK_CLAIMS = {
+  iss: 'http://localhost:54321/auth/v1',
+  sub: DEV_MOCK_USER.id,
+  aud: DEV_MOCK_USER.aud,
+  exp: 2_524_608_000,
+  iat: 1_735_689_600,
+  role: DEV_MOCK_USER.role,
+  aal: 'aal1' as const,
+  session_id: DEV_MOCK_USER.id,
+  email: DEV_MOCK_USER.email,
+  app_metadata: DEV_MOCK_USER.app_metadata,
+  user_metadata: DEV_MOCK_USER.user_metadata,
+};
+
+function hasAuthMethod<K extends 'getUser' | 'getClaims'>(
+  auth: unknown,
+  key: K
+): auth is Record<K, (...args: never[]) => unknown> {
+  return (
+    typeof auth === 'object' &&
+    auth !== null &&
+    typeof Reflect.get(auth, key) === 'function'
+  );
+}
+
 export async function createClient() {
   const cookieStore = await cookies();
   const isAuthBypassed =
@@ -42,20 +67,32 @@ export async function createClient() {
   );
 
   // DEV: auth disabled — shadow auth methods with mock implementations
-  if (isAuthBypassed) {
-    const auth = client.auth as unknown as Record<string, unknown>;
-    auth.getUser = async () => ({ data: { user: DEV_MOCK_USER }, error: null });
-    auth.getClaims = async () => ({
-      data: {
-        claims: {
-          sub: DEV_MOCK_USER.id,
-          email: DEV_MOCK_USER.email,
-          role: 'authenticated',
-          aud: 'authenticated',
-        },
-      },
+  if (
+    isAuthBypassed &&
+    hasAuthMethod(client.auth, 'getUser') &&
+    hasAuthMethod(client.auth, 'getClaims')
+  ) {
+    client.auth.getUser = async () => ({
+      data: { user: DEV_MOCK_USER },
       error: null,
     });
+    client.auth.getClaims = async (_jwt, _options) => {
+      void _jwt;
+      void _options;
+
+      return {
+        data: {
+          claims: DEV_MOCK_CLAIMS,
+          header: {
+            alg: 'HS256',
+            kid: 'dev',
+            typ: 'JWT',
+          },
+          signature: new Uint8Array(),
+        },
+        error: null,
+      };
+    };
   }
 
   return client;

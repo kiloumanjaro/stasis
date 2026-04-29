@@ -30,7 +30,7 @@ export function FeatureFooterCard({
   className,
   leftColumnClassName,
   rightColumnClassName,
-  brandName = 'statis',
+  brandName = 'stasis',
   brandImageSrc = '/images/green.png',
   brandImageAlt = 'Stasis',
 }: FeatureFooterCardProps) {
