@@ -65,8 +65,8 @@ function MobileNavLink({
       className={cn(
         'flex h-14 min-w-16 flex-1 items-center justify-center border-t-2 px-2 transition-colors',
         isActive
-          ? 'border-accent font-semibold text-foreground'
-          : 'border-transparent text-muted-foreground hover:text-foreground'
+          ? 'border-accent font-semibold text-white'
+          : 'border-transparent text-[#585858] hover:text-white'
       )}
     >
       <Icon className="h-5 w-5 shrink-0" />
@@ -145,8 +145,8 @@ export function Sidebar({ user }: SidebarProps) {
               className={cn(
                 'flex h-full w-full items-center justify-center border-t-2 px-2 transition-colors',
                 isOverflowActive || isMoreOpen
-                  ? 'border-accent text-foreground'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
+                  ? 'border-accent text-white'
+                  : 'border-transparent text-[#585858] hover:text-white'
               )}
             >
               <MoreHorizontal className="h-5 w-5 shrink-0" />
@@ -189,8 +189,8 @@ export function Sidebar({ user }: SidebarProps) {
                         className={cn(
                           'flex items-center gap-3 rounded-sm px-3 py-2 text-sm transition-colors hover:bg-accent',
                           isActivePath(pathname, item.href)
-                            ? 'font-semibold text-foreground'
-                            : 'text-muted-foreground hover:text-foreground'
+                            ? 'font-semibold text-white'
+                            : 'text-[#585858] hover:text-white'
                         )}
                       >
                         <item.icon className="h-4 w-4 shrink-0" />
@@ -207,7 +207,7 @@ export function Sidebar({ user }: SidebarProps) {
 
       <aside className="hidden w-16 flex-col bg-[#0f0f0f] md:fixed md:inset-y-0 md:left-0 md:z-30 md:flex">
         <div className="flex h-16 items-center justify-center">
-          <Link href="/dashboard" title="StudyAI">
+          <Link href="/" title="StudyAI">
             <Image
               src="/images/green.png"
               alt="StudyAI"
@@ -228,9 +228,7 @@ export function Sidebar({ user }: SidebarProps) {
                 title={item.label}
                 className={cn(
                   'flex items-center justify-center rounded-lg p-3 transition-colors',
-                  isActive
-                    ? 'text-[#f0f0eb]'
-                    : 'text-[#bfbfba] hover:text-[#f0f0eb]'
+                  isActive ? 'text-white' : 'text-[#585858] hover:text-white'
                 )}
               >
                 <item.icon className="h-5 w-5" />
