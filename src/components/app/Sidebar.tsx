@@ -245,7 +245,7 @@ export function Sidebar({ user }: SidebarProps) {
               className="flex justify-center"
             >
               <Button
-                className="bg-none"
+                className="bg-none text-[#585858] hover:text-white"
                 size="icon"
                 type="submit"
                 title="Sign out"
