@@ -29,6 +29,7 @@ export interface CameraDevice {
 interface CameraContextType {
   videoRef: RefObject<HTMLVideoElement | null>;
   registerVideoRef: (ref: RefObject<HTMLVideoElement | null>) => void;
+  stream: MediaStream | null;
 
   isCameraActive: boolean;
   isLoading: boolean;
@@ -48,20 +49,6 @@ interface CameraContextType {
 const BLOCKED_MESSAGE =
   'Camera access is blocked. Enable camera permissions in your browser settings, then reload this page.';
 
-// Ordered preference for the auto-selected camera. Matched case-insensitively
-// against the device label. First match wins; falls back to devices[0].
-const PREFERRED_DEVICE_LABELS = ['USB2.0 HD UVC WebCam', 'UVC', 'USB'];
-
-function pickDefaultDevice(devices: CameraDevice[]): string {
-  for (const pattern of PREFERRED_DEVICE_LABELS) {
-    const match = devices.find((d) =>
-      d.label.toLowerCase().includes(pattern.toLowerCase())
-    );
-    if (match) return match.deviceId;
-  }
-  return devices[0]?.deviceId ?? '';
-}
-
 const CameraContext = createContext<CameraContextType | null>(null);
 
 export function CameraProvider({ children }: { children: ReactNode }) {
@@ -72,17 +59,17 @@ export function CameraProvider({ children }: { children: ReactNode }) {
 
   const streamRef = useRef<MediaStream | null>(null);
   const sessionActiveRef = useRef(false);
+  const userPickedDeviceRef = useRef(false);
 
+  const [stream, setStream] = useState<MediaStream | null>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [permissionState, setPermissionState] =
     useState<CameraPermissionState>('unknown');
   const [errorType, setErrorType] = useState<CameraErrorType>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
   const [devices, setDevices] = useState<CameraDevice[]>([]);
   const [selectedDeviceId, setSelectedDeviceIdState] = useState<string>('');
-  const userPickedDeviceRef = useRef(false);
 
   const stopStreamInternal = useCallback(() => {
     if (streamRef.current) {
@@ -92,6 +79,7 @@ export function CameraProvider({ children }: { children: ReactNode }) {
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
+    setStream(null);
     setIsCameraActive(false);
   }, [videoRef]);
 
@@ -149,8 +137,6 @@ export function CameraProvider({ children }: { children: ReactNode }) {
     if (typeof navigator === 'undefined' || !navigator.mediaDevices) return;
     try {
       const all = await navigator.mediaDevices.enumerateDevices();
-      // Pre-permission, browsers may return placeholder entries with empty
-      // deviceIds — drop those so the picker only shows selectable cameras.
       const videoDevices = all
         .filter((d) => d.kind === 'videoinput' && d.deviceId)
         .map((d, i) => ({
@@ -158,10 +144,9 @@ export function CameraProvider({ children }: { children: ReactNode }) {
           label: d.label || `Camera ${i + 1}`,
         }));
       setDevices(videoDevices);
-      setSelectedDeviceIdState((prev) => {
-        if (prev && videoDevices.some((d) => d.deviceId === prev)) return prev;
-        return pickDefaultDevice(videoDevices);
-      });
+      setSelectedDeviceIdState((prev) =>
+        prev && videoDevices.some((d) => d.deviceId === prev) ? prev : ''
+      );
     } catch {
       // Enumeration failures are non-fatal.
     }
@@ -186,35 +171,33 @@ export function CameraProvider({ children }: { children: ReactNode }) {
     setErrorType(null);
     setErrorMessage(null);
 
-    // Treat a manual request as activating the session so the late-resolution
-    // guard below doesn't tear down the stream the user just asked for.
+    // Mark active so the late-resolution guard below doesn't tear down the
+    // stream the user explicitly asked for.
     sessionActiveRef.current = true;
 
     stopStreamInternal();
 
-    // Only pin to a deviceId when the user explicitly picked one. Auto-selected
-    // devices on Windows are often IR sensors or virtual cameras that fail with
-    // NotReadableError — letting the browser resolve facingMode is more reliable.
     const videoConstraint: MediaTrackConstraints =
       userPickedDeviceRef.current && selectedDeviceId
         ? { deviceId: { exact: selectedDeviceId }, facingMode: 'user' }
         : { facingMode: 'user' };
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const newStream = await navigator.mediaDevices.getUserMedia({
         video: videoConstraint,
         audio: false,
       });
 
       if (!sessionActiveRef.current) {
-        stream.getTracks().forEach((t) => t.stop());
+        newStream.getTracks().forEach((t) => t.stop());
         setIsLoading(false);
         return;
       }
 
-      streamRef.current = stream;
+      streamRef.current = newStream;
+      setStream(newStream);
       if (videoRef.current) {
-        videoRef.current.srcObject = stream;
+        videoRef.current.srcObject = newStream;
       }
 
       setIsCameraActive(true);
@@ -290,9 +273,8 @@ export function CameraProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (prevDeviceRef.current === selectedDeviceId) return;
     prevDeviceRef.current = selectedDeviceId;
-    if (streamRef.current && sessionActiveRef.current) {
-      void requestStream();
-    }
+    if (!selectedDeviceId) return;
+    void requestStream();
   }, [selectedDeviceId, requestStream]);
 
   useEffect(() => {
@@ -320,6 +302,9 @@ export function CameraProvider({ children }: { children: ReactNode }) {
   const registerVideoRef = useCallback(
     (ref: RefObject<HTMLVideoElement | null>) => {
       setRegisteredRef(ref);
+      if (ref.current && streamRef.current) {
+        ref.current.srcObject = streamRef.current;
+      }
     },
     []
   );
@@ -327,6 +312,7 @@ export function CameraProvider({ children }: { children: ReactNode }) {
   const value: CameraContextType = {
     videoRef,
     registerVideoRef,
+    stream,
     isCameraActive,
     isLoading,
     permissionState,

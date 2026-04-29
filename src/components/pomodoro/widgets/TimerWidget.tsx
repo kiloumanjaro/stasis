@@ -32,12 +32,11 @@ const DEFAULT_SETTINGS: TimerSettings = {
   sessionsBeforeLongBreak: 4,
 };
 
-// Module-level state to persist timer across component unmounts
 let persistedState: {
   settings: TimerSettings;
   mode: TimerMode;
-  endTime: number | null; // timestamp when timer should end
-  pausedTimeRemaining: number | null; // time remaining when paused
+  endTime: number | null;
+  pausedTimeRemaining: number | null;
   isRunning: boolean;
   currentSession: number;
   sessionsCompleted: number;
@@ -108,17 +107,21 @@ export function TimerWidget() {
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Camera streams during focus only, not during breaks.
+  // Ref keeps the effect deps stable so a CameraProvider re-render doesn't
+  // toggle the stream off/on and flicker the feed.
   const camera = useCameraContextSafe();
+  const cameraRef = useRef(camera);
+  cameraRef.current = camera;
+
   useEffect(() => {
-    camera?.setSessionActive(isRunning && mode === 'focus');
-  }, [isRunning, mode, camera]);
+    cameraRef.current?.setSessionActive(isRunning && mode === 'focus');
+  }, [isRunning, mode]);
 
   useEffect(() => {
     return () => {
-      camera?.setSessionActive(false);
+      cameraRef.current?.setSessionActive(false);
     };
-  }, [camera]);
+  }, []);
 
   // Persist state to module-level variable
   useEffect(() => {
