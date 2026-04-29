@@ -205,7 +205,7 @@ export function Sidebar({ user }: SidebarProps) {
         </nav>
       </div>
 
-      <aside className="hidden w-16 flex-col bg-[#0f0f0f] md:flex">
+      <aside className="hidden w-16 flex-col bg-[#0f0f0f] md:fixed md:inset-y-0 md:left-0 md:z-30 md:flex">
         <div className="flex h-16 items-center justify-center">
           <Link href="/dashboard" title="StudyAI">
             <Image

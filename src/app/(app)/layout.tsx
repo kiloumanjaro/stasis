@@ -100,7 +100,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="app-shell flex min-h-screen bg-[#1f1e1d]">
       {/* DEV: auth disabled — DEV MODE banner; remove when re-enabling auth */}
       {process.env.NEXT_PUBLIC_SKIP_AUTH === 'true' && (
         <div className="fixed bottom-0 left-0 right-0 z-50 bg-yellow-400 px-4 py-1 text-center text-xs font-bold text-yellow-900">
@@ -108,8 +108,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       )}
       <Sidebar user={user} />
-      <main className="flex-1 overflow-auto bg-[#1f1e1d] pb-14 md:pb-0">
-        <div className="container mx-auto px-6 pb-0 pt-6 md:p-6">
+      <main className="app-shell-main flex-1 overflow-auto bg-[#1f1e1d]">
+        <div className="app-shell-page container mx-auto px-6 pb-0 pt-6 md:p-6">
           {children}
         </div>
       </main>
