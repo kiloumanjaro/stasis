@@ -2,9 +2,9 @@ import { createClient } from '@/lib/supabase/server';
 
 export interface Profile {
   id: string;
-  full_name: string | null;
+  fullname: string | null;
   email: string | null;
-  avatar_url: string | null;
+  pictureUrl: string | null;
 }
 
 export async function getProfile(userId: string): Promise<Profile | null> {
@@ -21,15 +21,20 @@ export async function getProfile(userId: string): Promise<Profile | null> {
     return null;
   }
 
-  return data;
+  return {
+    id: data.id,
+    fullname: data.full_name,
+    email: data.email,
+    pictureUrl: data.avatar_url,
+  };
 }
 
 export async function createProfile(
   userId: string,
   userData: {
-    full_name?: string;
+    fullname?: string;
     email?: string;
-    avatar_url?: string;
+    pictureUrl?: string;
   }
 ): Promise<Profile | null> {
   const supabase = await createClient();
@@ -38,9 +43,9 @@ export async function createProfile(
     .from('profiles')
     .insert({
       id: userId,
-      full_name: userData.full_name,
+      full_name: userData.fullname,
       email: userData.email,
-      avatar_url: userData.avatar_url,
+      avatar_url: userData.pictureUrl,
     })
     .select()
     .single();
@@ -50,15 +55,20 @@ export async function createProfile(
     return null;
   }
 
-  return data;
+  return {
+    id: data.id,
+    fullname: data.full_name,
+    email: data.email,
+    pictureUrl: data.avatar_url,
+  };
 }
 
 export async function upsertProfile(
   userId: string,
   userData: {
-    full_name?: string;
+    fullname?: string;
     email?: string;
-    avatar_url?: string;
+    pictureUrl?: string;
   }
 ): Promise<Profile | null> {
   const supabase = await createClient();
@@ -67,9 +77,9 @@ export async function upsertProfile(
     .from('profiles')
     .upsert({
       id: userId,
-      full_name: userData.full_name,
+      full_name: userData.fullname,
       email: userData.email,
-      avatar_url: userData.avatar_url,
+      avatar_url: userData.pictureUrl,
     })
     .select()
     .single();
@@ -79,5 +89,10 @@ export async function upsertProfile(
     return null;
   }
 
-  return data;
+  return {
+    id: data.id,
+    fullname: data.full_name,
+    email: data.email,
+    pictureUrl: data.avatar_url,
+  };
 }

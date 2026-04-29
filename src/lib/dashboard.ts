@@ -1,5 +1,5 @@
-import type { User } from '@supabase/supabase-js';
-
+import type { BackendAuthUser } from '@/lib/backend-auth';
+import { getAuthenticatedBackendUser } from '@/lib/backend-auth-server';
 import { createClient } from '@/lib/supabase/server';
 
 type DashboardRow = Record<string, unknown>;
@@ -129,15 +129,13 @@ function getEmailPrefix(email: string | null | undefined): string {
   return prefix?.trim() || 'there';
 }
 
-function getDisplayName(user: User, profileRow: DashboardRow | null): string {
-  const metadata =
-    user.user_metadata && typeof user.user_metadata === 'object'
-      ? (user.user_metadata as DashboardRow)
-      : null;
-
+function getDisplayName(
+  user: BackendAuthUser,
+  profileRow: DashboardRow | null
+): string {
   return (
     readString(profileRow, ['display_name', 'full_name']) ||
-    readString(metadata, ['display_name', 'full_name', 'name']) ||
+    user.name?.trim() ||
     getEmailPrefix(user.email)
   );
 }
@@ -296,10 +294,7 @@ async function getDailyStats(
 }
 
 export async function getDashboardGreetingData(): Promise<DashboardGreetingData> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthenticatedBackendUser();
 
   if (!user) {
     return {
@@ -315,6 +310,7 @@ export async function getDashboardGreetingData(): Promise<DashboardGreetingData>
     };
   }
 
+  const supabase = await createClient();
   const [profileRow, dailyStats] = await Promise.all([
     getProfileRow(supabase, user.id),
     getDailyStats(supabase, user.id),

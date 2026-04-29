@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { getAuthenticatedBackendUser } from '@/lib/backend-auth-server';
 import { createClient } from '@/lib/supabase/server';
 
 export type DefaultCardSort = 'due_date' | 'difficulty' | 'random';
@@ -107,21 +108,6 @@ async function syncDisplayName(
   if (legacyError) {
     console.error('Failed to update legacy profile display name:', legacyError);
   }
-
-  const { error: metadataError } = await supabase.auth.updateUser({
-    data: {
-      name: normalized,
-      full_name: normalized,
-      display_name: normalized,
-    },
-  });
-
-  if (metadataError) {
-    console.error(
-      'Failed to update auth metadata display name:',
-      metadataError
-    );
-  }
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -213,13 +199,13 @@ function normalizeSettings(input: SettingsProfile): SettingsProfile {
 function buildDefaultProfileForUser(user: {
   id: string;
   email?: string | null;
-  user_metadata?: { name?: string };
+  name?: string | null;
 }): SettingsProfile {
   return {
     ...DEFAULT_SETTINGS,
     id: user.id,
     email: user.email ?? null,
-    display_name: user.user_metadata?.name ?? null,
+    display_name: user.name ?? null,
   };
 }
 
@@ -236,12 +222,9 @@ async function fetchUserProfileRow(
 
 async function getAuthenticatedUser() {
   const supabase = await createClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+  const user = await getAuthenticatedBackendUser();
 
-  if (error || !user) {
+  if (!user) {
     return { supabase, user: null, error: 'User is not authenticated.' };
   }
 
@@ -290,9 +273,7 @@ export async function getSettingsProfile() {
     id: user.id,
     email: user.email ?? null,
     display_name:
-      (base?.display_name as string | undefined) ??
-      user.user_metadata?.name ??
-      null,
+      (base?.display_name as string | undefined) ?? user.name ?? null,
   };
 
   return {
@@ -332,10 +313,7 @@ export async function saveSettingsProfile(input: SettingsProfile) {
     id: user.id,
     email: user.email ?? existing.email ?? null,
     display_name:
-      input.display_name ??
-      existing.display_name ??
-      user.user_metadata?.name ??
-      null,
+      input.display_name ?? existing.display_name ?? user.name ?? null,
   };
 
   const normalized = normalizeSettings(merged);
@@ -421,13 +399,13 @@ export async function updatePasswordAction(nextPassword: string) {
     return { ok: false, message: error };
   }
 
-  const { error: updateError } = await supabase.auth.updateUser({ password });
+  void supabase;
 
-  if (updateError) {
-    return { ok: false, message: updateError.message };
-  }
-
-  return { ok: true, message: 'Password changed successfully.' };
+  return {
+    ok: false,
+    message:
+      'Password changes are not available for Google OAuth accounts in this frontend.',
+  };
 }
 
 export async function exportUserDataAction() {
@@ -515,12 +493,6 @@ export async function deleteAccountAction() {
     legacyProfileDeleteError.code !== 'PGRST116'
   ) {
     return { ok: false, message: legacyProfileDeleteError.message };
-  }
-
-  const { error: signOutError } = await supabase.auth.signOut();
-
-  if (signOutError) {
-    return { ok: false, message: signOutError.message };
   }
 
   return {

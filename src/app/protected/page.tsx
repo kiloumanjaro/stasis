@@ -1,33 +1,24 @@
 import { redirect } from 'next/navigation';
 
-import { createClient } from '@/lib/supabase/server';
+import { cookies } from 'next/headers';
+
+import { getBackendUser } from '@/lib/backend-auth';
 import { InfoIcon } from 'lucide-react';
 import { Suspense } from 'react';
 
 async function UserDetails() {
-  // Dedicated toggle for the hardcoded protected-page demo payload.
-  // Keep this false to use real claims (or SKIP_AUTH mock claims from server.ts).
-  if (process.env.SHOW_PROTECTED_PAGE_DEMO_USER === 'true') {
-    return JSON.stringify(
-      {
-        sub: 'demo-user',
-        email: 'demo@example.com',
-        role: 'authenticated',
-        note: 'Auth bypassed - mock user data',
-      },
-      null,
-      2
-    );
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore
+    .getAll()
+    .map(({ name, value }) => `${name}=${value}`)
+    .join('; ');
+  const user = await getBackendUser(cookieHeader);
+
+  if (!user) {
+    redirect('/auth/sign-up');
   }
 
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.getClaims();
-
-  if (error || !data?.claims) {
-    redirect('/auth/login');
-  }
-
-  return JSON.stringify(data.claims, null, 2);
+  return JSON.stringify(user, null, 2);
 }
 
 export default function ProtectedPage() {

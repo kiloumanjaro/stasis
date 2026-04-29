@@ -3,92 +3,53 @@
 'use client';
 
 import { Sidebar } from '@/components/app/Sidebar';
-import { createClient } from '@/lib/supabase/client';
-import { useEffect, useState, useCallback } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
-import type { User } from '@supabase/supabase-js';
-
-// DEV: auth disabled — mock user injected client-side when NEXT_PUBLIC_SKIP_AUTH=true
-// Remove this constant and the SKIP_AUTH guard below to restore real auth.
-const DEV_MOCK_USER = {
-  id: 'eb00d0b0-848e-4ffe-97b6-6903c829cf22',
-  email: 'dev@localhost.dev',
-  role: 'authenticated',
-  aud: 'authenticated',
-  app_metadata: { provider: 'dev' },
-  user_metadata: { name: 'Dev User', avatar_url: null },
-  created_at: '2025-01-01T00:00:00.000Z',
-} as unknown as User;
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { getBackendUser, type BackendAuthUser } from '@/lib/backend-auth';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<BackendAuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  const pathname = usePathname();
-
-  const checkOnboarding = useCallback(async () => {
-    // DEV: auth disabled — onboarding redirect suppressed; remove guard to restore
-    if (process.env.NEXT_PUBLIC_SKIP_AUTH === 'true') {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const response = await fetch('/api/onboarding/check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currentPath: pathname }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to check onboarding status');
-      }
-
-      const { redirectPath } = await response.json();
-      if (redirectPath) {
-        router.push(redirectPath);
-      }
-    } catch (error) {
-      console.error('Error checking onboarding:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [pathname, router]);
 
   useEffect(() => {
-    // DEV: auth disabled — real Supabase session check bypassed; mock user used instead
-    if (process.env.NEXT_PUBLIC_SKIP_AUTH === 'true') {
-      setUser(DEV_MOCK_USER);
-      setLoading(false);
-      return;
-    }
+    let isMounted = true;
 
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUser(user);
+    const syncAuthState = async () => {
+      try {
+        const currentUser = await getBackendUser();
 
-      if (user) {
-        checkOnboarding();
-      } else {
-        router.replace('/auth/sign-up');
+        if (!isMounted) {
+          return;
+        }
+
+        if (!currentUser) {
+          setUser(null);
+          setLoading(false);
+          router.replace('/auth/sign-up');
+          return;
+        }
+
+        setUser(currentUser);
         setLoading(false);
-      }
-    });
+      } catch (error) {
+        console.error('Error verifying authenticated user:', error);
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        checkOnboarding();
-      } else {
-        router.replace('/auth/sign-up');
+        if (!isMounted) {
+          return;
+        }
+
+        setUser(null);
         setLoading(false);
+        router.replace('/auth/sign-up');
       }
-    });
+    };
+    void syncAuthState();
 
-    return () => subscription.unsubscribe();
-  }, [checkOnboarding, router]);
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
 
   if (loading) {
     return (
@@ -101,7 +62,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!user && process.env.NEXT_PUBLIC_SKIP_AUTH !== 'true') {
+  if (!user) {
     return null;
   }
 

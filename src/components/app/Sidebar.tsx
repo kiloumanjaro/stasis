@@ -17,9 +17,9 @@ import {
   Upload,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import type { User } from '@supabase/supabase-js';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import type { BackendAuthUser } from '@/lib/backend-auth';
 
 const MOBILE_PRIMARY_HREFS = ['/dashboard', '/roadmap', '/pomodoro'] as const;
 const MOBILE_PRIMARY_HREF_SET = new Set<string>(MOBILE_PRIMARY_HREFS);
@@ -40,7 +40,7 @@ const navItems: NavItem[] = [
 ];
 
 interface SidebarProps {
-  user: User | null;
+  user: BackendAuthUser | null;
 }
 
 function isActivePath(pathname: string, href: string) {
