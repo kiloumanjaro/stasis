@@ -12,6 +12,7 @@ import {
   Map,
   MoreHorizontal,
   Scan,
+  Settings,
   Timer,
   Upload,
 } from 'lucide-react';
@@ -35,6 +36,7 @@ const navItems: NavItem[] = [
   { href: '/roadmap', label: 'Roadmap', icon: Map },
   { href: '/pomodoro', label: 'Pomodoro', icon: Timer },
   { href: '/cv', label: 'Emotion AI', icon: Scan },
+  { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
 interface SidebarProps {

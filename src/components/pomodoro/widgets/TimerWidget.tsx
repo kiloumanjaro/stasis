@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,6 +24,10 @@ interface TimerSettings {
   sessionsBeforeLongBreak: number;
 }
 
+interface TimerWidgetProps {
+  initialSettings?: Partial<TimerSettings>;
+}
+
 const DEFAULT_SETTINGS: TimerSettings = {
   focusDuration: 25,
   shortBreakDuration: 5,
@@ -44,17 +48,30 @@ let persistedState: {
   totalBreakTime: number;
 } | null = null;
 
-export function TimerWidget() {
+export function TimerWidget({ initialSettings }: TimerWidgetProps) {
+  const resolvedInitialSettings = useMemo(
+    () => ({
+      ...DEFAULT_SETTINGS,
+      ...initialSettings,
+    }),
+    [
+      initialSettings?.focusDuration,
+      initialSettings?.shortBreakDuration,
+      initialSettings?.longBreakDuration,
+      initialSettings?.sessionsBeforeLongBreak,
+    ]
+  );
+
   // Initialize from persisted state or defaults
   const getInitialState = () => {
     if (persistedState) {
       return persistedState;
     }
     return {
-      settings: DEFAULT_SETTINGS,
+      settings: resolvedInitialSettings,
       mode: 'focus' as TimerMode,
       endTime: null,
-      pausedTimeRemaining: DEFAULT_SETTINGS.focusDuration * 60,
+      pausedTimeRemaining: resolvedInitialSettings.focusDuration * 60,
       isRunning: false,
       currentSession: 1,
       sessionsCompleted: 0,
@@ -101,7 +118,8 @@ export function TimerWidget() {
       return remaining;
     }
     return (
-      initialState.pausedTimeRemaining ?? DEFAULT_SETTINGS.focusDuration * 60
+      initialState.pausedTimeRemaining ??
+      resolvedInitialSettings.focusDuration * 60
     );
   });
 
@@ -130,6 +148,51 @@ export function TimerWidget() {
     sessionsCompleted,
     totalFocusTime,
     totalBreakTime,
+  ]);
+
+  useEffect(() => {
+    if (!initialSettings) {
+      return;
+    }
+
+    if (isRunning || endTime) {
+      return;
+    }
+
+    const matchesCurrent =
+      settings.focusDuration === resolvedInitialSettings.focusDuration &&
+      settings.shortBreakDuration ===
+        resolvedInitialSettings.shortBreakDuration &&
+      settings.longBreakDuration ===
+        resolvedInitialSettings.longBreakDuration &&
+      settings.sessionsBeforeLongBreak ===
+        resolvedInitialSettings.sessionsBeforeLongBreak;
+
+    if (matchesCurrent) {
+      return;
+    }
+
+    setSettings(resolvedInitialSettings);
+
+    const nextDuration =
+      mode === 'focus'
+        ? resolvedInitialSettings.focusDuration * 60
+        : mode === 'shortBreak'
+          ? resolvedInitialSettings.shortBreakDuration * 60
+          : resolvedInitialSettings.longBreakDuration * 60;
+
+    setPausedTimeRemaining(nextDuration);
+    setDisplayTime(nextDuration);
+  }, [
+    initialSettings,
+    resolvedInitialSettings,
+    isRunning,
+    endTime,
+    mode,
+    settings.focusDuration,
+    settings.shortBreakDuration,
+    settings.longBreakDuration,
+    settings.sessionsBeforeLongBreak,
   ]);
 
   // Format time as MM:SS

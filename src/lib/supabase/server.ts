@@ -41,6 +41,9 @@ function hasAuthMethod<K extends 'getUser' | 'getClaims'>(
 
 export async function createClient() {
   const cookieStore = await cookies();
+  const isAuthBypassed =
+    process.env.SKIP_AUTH === 'true' ||
+    process.env.NEXT_PUBLIC_SKIP_AUTH === 'true';
 
   const client = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://localhost:54321',
@@ -65,7 +68,7 @@ export async function createClient() {
 
   // DEV: auth disabled — shadow auth methods with mock implementations
   if (
-    process.env.SKIP_AUTH === 'true' &&
+    isAuthBypassed &&
     hasAuthMethod(client.auth, 'getUser') &&
     hasAuthMethod(client.auth, 'getClaims')
   ) {

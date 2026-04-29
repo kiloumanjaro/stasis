@@ -8,6 +8,7 @@ const REQUIRED_ENV_VARS: Record<string, string> = {
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
   NEXT_PUBLIC_SUPABASE_ANON_KEY:
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
+  DATABASE_URL: process.env.DATABASE_URL ?? '',
   OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? '',
   GEMINI_API_KEY: process.env.GEMINI_API_KEY ?? '',
 };
@@ -57,7 +58,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.className} bg-[#1f1e1d] antialiased`}>
+      <body
+        suppressHydrationWarning
+        className={`${geistSans.className} bg-[#1f1e1d] antialiased`}
+      >
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
