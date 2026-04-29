@@ -3,39 +3,18 @@
 /**
  * Authentication Actions
  *
- * This application uses Google OAuth exclusively for authentication.
- * Password-based authentication is not supported.
+ * This application uses the backend auth service for Google OAuth.
  */
 
 import { redirect } from 'next/navigation';
 
-import { createClient } from '@/lib/supabase/server';
+import { getBackendAuthUrl } from '@/lib/backend-auth';
 
 export async function signout() {
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signOut();
-  if (error) {
-    redirect('/error');
-  }
-
-  redirect('/logout');
+  redirect('/auth/logout');
 }
 
 export async function signInWithGoogle() {
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      queryParams: {
-        access_type: 'offline',
-        prompt: 'consent',
-      },
-    },
-  });
-
-  if (error) {
-    redirect('/error');
-  }
-
-  redirect(data.url);
+  const url = await getBackendAuthUrl();
+  redirect(url);
 }

@@ -1,20 +1,31 @@
 'use client';
 import { Button } from '@/components/ui/button';
-import { useRouter } from 'next/navigation';
+import { getBackendAuthUrl } from '@/lib/backend-auth';
+import { useState } from 'react';
 import React from 'react';
 
 const SignInWithGoogleButton = () => {
-  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSignIn = async () => {
+    setIsLoading(true);
+
+    try {
+      const url = await getBackendAuthUrl();
+      window.location.assign(url);
+    } catch (error) {
+      console.error('Failed to start Google sign-in:', error);
+      setIsLoading(false);
+    }
+  };
 
   return (
     <Button
       variant="ghost"
       className="w-48 items-center rounded-3xl py-5 text-[#40403e]"
       size="default"
-      onClick={() => {
-        // Temporarily skip auth - navigate directly to dashboard
-        router.push('/dashboard');
-      }}
+      disabled={isLoading}
+      onClick={handleSignIn}
     >
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
         <path
@@ -35,7 +46,7 @@ const SignInWithGoogleButton = () => {
         />
         <path fill="none" d="M1 1h22v22H1z" />
       </svg>
-      Login with Google
+      {isLoading ? 'Connecting...' : 'Login with Google'}
     </Button>
   );
 };

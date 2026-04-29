@@ -1,13 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { extname, join, relative } from 'node:path';
 
-type Violation = {
-  file: string;
-  line: number;
-  type: string;
-  detail: string;
-};
-
 const SRC_DIR = join(process.cwd(), 'src');
 const ALLOWED_EXTENSIONS = new Set(['.ts', '.tsx']);
 
@@ -57,11 +50,11 @@ const forbiddenImportChecks = [
     regex:
       /\b(?:from\s*['"]sequelize['"]|import\s*\(\s*['"]sequelize['"]\s*\)|require\(\s*['"]sequelize['"]\s*\))/,
   },
-] as const;
+];
 
-function collectFiles(dir: string): string[] {
+function collectFiles(dir) {
   const entries = readdirSync(dir, { withFileTypes: true });
-  const files: string[] = [];
+  const files = [];
 
   for (const entry of entries) {
     const fullPath = join(dir, entry.name);
@@ -79,9 +72,9 @@ function collectFiles(dir: string): string[] {
   return files;
 }
 
-function scanFile(filePath: string): Violation[] {
+function scanFile(filePath) {
   const lines = readFileSync(filePath, 'utf8').split(/\r?\n/);
-  const violations: Violation[] = [];
+  const violations = [];
 
   lines.forEach((line, index) => {
     for (const check of forbiddenImportChecks) {
@@ -124,4 +117,4 @@ if (violations.length > 0) {
   process.exit(1);
 }
 
-console.log('✅ No backend boundary violations found');
+console.log('No backend boundary violations found');

@@ -2,17 +2,14 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
+import { getBackendUser } from '@/lib/backend-auth';
 
 export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
     const checkUser = async () => {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await getBackendUser();
 
       if (user) {
         router.push('/dashboard');
@@ -21,7 +18,7 @@ export default function Home() {
       }
     };
 
-    checkUser();
+    void checkUser();
   }, [router]);
 
   return (
