@@ -1,3 +1,5 @@
+// MOBILE NAV REFACTOR — sidebar → top bar
+
 'use client';
 
 import { Sidebar } from '@/components/app/Sidebar';
@@ -112,8 +114,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       )}
       <Sidebar user={user} />
-      <main className="flex-1 overflow-auto bg-[#1f1e1d]">
-        <div className="container mx-auto p-6">{children}</div>
+      <main className="flex-1 overflow-auto bg-[#1f1e1d] pb-14 md:pb-0">
+        <div className="container mx-auto px-6 pb-0 pt-6 md:p-6">
+          {children}
+        </div>
       </main>
     </div>
   );
