@@ -88,7 +88,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
-  }, [checkOnboarding]);
+  }, [checkOnboarding, router]);
 
   if (loading) {
     return (
