@@ -5,8 +5,9 @@ import { InfoIcon } from 'lucide-react';
 import { Suspense } from 'react';
 
 async function UserDetails() {
-  // Skip authentication if SKIP_AUTH environment variable is set to 'true'
-  if (process.env.SKIP_AUTH === 'true') {
+  // Dedicated toggle for the hardcoded protected-page demo payload.
+  // Keep this false to use real claims (or SKIP_AUTH mock claims from server.ts).
+  if (process.env.SHOW_PROTECTED_PAGE_DEMO_USER === 'true') {
     return JSON.stringify(
       {
         sub: 'demo-user',

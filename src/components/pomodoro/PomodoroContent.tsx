@@ -20,14 +20,32 @@ interface WidgetState {
   addFlashcards: { isOpen: boolean };
 }
 
-export function PomodoroContent() {
+interface PomodoroContentProps {
+  initialTimerSettings?: {
+    focusDuration?: number;
+    shortBreakDuration?: number;
+    longBreakDuration?: number;
+  };
+  initialCvMonitoringEnabled?: boolean;
+  cardAnimationEnabled?: boolean;
+  shortcutsEnabled?: boolean;
+}
+
+export function PomodoroContent({
+  initialTimerSettings,
+  initialCvMonitoringEnabled = false,
+  cardAnimationEnabled = true,
+  shortcutsEnabled = true,
+}: PomodoroContentProps) {
   const [widgets, setWidgets] = useState<WidgetState>({
-    camera: { isOpen: false },
+    camera: { isOpen: initialCvMonitoringEnabled },
     timer: { isOpen: false },
-    monitor: { isOpen: false },
+    monitor: { isOpen: initialCvMonitoringEnabled },
     addFlashcards: { isOpen: false },
   });
-  const [activeWidget, setActiveWidget] = useState<WidgetType | null>(null);
+  const [activeWidget, setActiveWidget] = useState<WidgetType | null>(
+    initialCvMonitoringEnabled ? 'monitor' : null
+  );
   const [timerInitialX, setTimerInitialX] = useState(0);
   const [monitorInitialX, setMonitorInitialX] = useState(0);
 
@@ -137,7 +155,11 @@ export function PomodoroContent() {
 
       {/* Flashcard Practice Area - main focus */}
       <div className="flex flex-1 items-center justify-center">
-        <FlashcardPracticeArea onRequestEditDeck={openEditDeck} />
+        <FlashcardPracticeArea
+          onRequestEditDeck={openEditDeck}
+          cardAnimationEnabled={cardAnimationEnabled}
+          shortcutsEnabled={shortcutsEnabled}
+        />
       </div>
 
       {/* Add Flashcards Button - floating action button */}
@@ -187,7 +209,7 @@ export function PomodoroContent() {
         width={320}
         minHeight={520}
       >
-        <TimerWidget />
+        <TimerWidget initialSettings={initialTimerSettings} />
       </DraggableWidget>
 
       {/* Floating CV Monitor Widget - positioned left of timer */}

@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Loader2, Layers, Clock, ArrowLeft } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import {
   CardState,
   Difficulty,
@@ -53,8 +54,12 @@ interface DeckStats {
 
 export function FlashcardPracticeArea({
   onRequestEditDeck,
+  cardAnimationEnabled = true,
+  shortcutsEnabled = true,
 }: {
   onRequestEditDeck?: (deck: FlashcardDeck) => void;
+  cardAnimationEnabled?: boolean;
+  shortcutsEnabled?: boolean;
 }) {
   // Loading spinner component
   const LoadingSpinner = () => (
@@ -63,6 +68,7 @@ export function FlashcardPracticeArea({
       <span className="text-lg text-white">Loading...</span>
     </div>
   );
+  const enableCardAnimation = cardAnimationEnabled !== false;
   const [decks, setDecks] = useState<FlashcardDeck[]>([]);
   const [deckStats, setDeckStats] = useState<Record<number, DeckStats>>({});
   const [selectedDeck, setSelectedDeck] = useState<FlashcardDeck | null>(null);
@@ -354,6 +360,84 @@ export function FlashcardPracticeArea({
       setError(err instanceof Error ? err.message : 'Failed to update card');
     }
   };
+
+  useEffect(() => {
+    if (!shortcutsEnabled) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) {
+        return;
+      }
+
+      const target = event.target as HTMLElement | null;
+      if (target) {
+        const tagName = target.tagName;
+        if (
+          tagName === 'INPUT' ||
+          tagName === 'TEXTAREA' ||
+          tagName === 'SELECT' ||
+          tagName === 'BUTTON' ||
+          target.isContentEditable
+        ) {
+          return;
+        }
+      }
+
+      if (
+        !currentCardState ||
+        !currentQuestion ||
+        showDeckPreview ||
+        allMastered
+      ) {
+        return;
+      }
+
+      if ((event.key === ' ' || event.key === 'Enter') && !isFlipped) {
+        event.preventDefault();
+        handleFlip();
+        return;
+      }
+
+      if (!isFlipped) {
+        return;
+      }
+
+      switch (event.key) {
+        case '1':
+          event.preventDefault();
+          void handleDifficulty('again');
+          break;
+        case '2':
+          event.preventDefault();
+          void handleDifficulty('hard');
+          break;
+        case '3':
+          event.preventDefault();
+          void handleDifficulty('medium');
+          break;
+        case '4':
+          event.preventDefault();
+          void handleDifficulty('easy');
+          break;
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    shortcutsEnabled,
+    currentCardState,
+    currentQuestion,
+    showDeckPreview,
+    allMastered,
+    isFlipped,
+    handleDifficulty,
+    handleFlip,
+  ]);
 
   const handleOptionalStop = () => {
     setSelectedDeck(null);
@@ -878,7 +962,13 @@ export function FlashcardPracticeArea({
         {/* Flashcard */}
         <div className="flex flex-col items-center">
           <div onClick={handleFlip} className="mb-8 w-full cursor-pointer">
-            <Card className="flex min-h-80 flex-col items-center justify-center border border-[#4a4a46] bg-[#191919] p-8 transition-all duration-300 hover:border-[#5a5a56] hover:shadow-2xl">
+            <Card
+              className={cn(
+                'flex min-h-80 flex-col items-center justify-center border border-[#4a4a46] bg-[#191919] p-8',
+                enableCardAnimation &&
+                  'transition-all duration-300 hover:border-[#5a5a56] hover:shadow-2xl'
+              )}
+            >
               <div className="flex w-full flex-1 flex-col justify-center text-center">
                 {!isFlipped ? (
                   <>
