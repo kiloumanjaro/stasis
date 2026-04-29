@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { getAppShellViewportInsets } from '@/lib/app-shell';
 
 interface Position {
   x: number;
@@ -38,12 +39,18 @@ export function useDrag({
     (pos: Position): Position => {
       if (typeof window === 'undefined') return pos;
 
+      const insets = getAppShellViewportInsets();
+      const minX = insets.left + boundaryPadding;
+      const minY = boundaryPadding;
       const maxX = window.innerWidth - elementWidth - boundaryPadding;
-      const maxY = window.innerHeight - elementHeight - boundaryPadding;
+      const maxY =
+        window.innerHeight - elementHeight - boundaryPadding - insets.bottom;
+      const clampedMaxX = Math.max(minX, maxX);
+      const clampedMaxY = Math.max(minY, maxY);
 
       return {
-        x: Math.max(boundaryPadding, Math.min(pos.x, maxX)),
-        y: Math.max(boundaryPadding, Math.min(pos.y, maxY)),
+        x: Math.max(minX, Math.min(pos.x, clampedMaxX)),
+        y: Math.max(minY, Math.min(pos.y, clampedMaxY)),
       };
     },
     [boundaryPadding, elementWidth, elementHeight]

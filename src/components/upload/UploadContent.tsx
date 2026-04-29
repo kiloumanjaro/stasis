@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { FeatureFooterCard } from '@/components/FeatureFooterCard';
 import { Icon } from '@iconify/react';
 import { Upload, FileText, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 
@@ -315,109 +316,83 @@ export function UploadContent() {
         </div>
       </div>
 
-      <Card className="border-none bg-[#0f0f0f] px-4 py-2">
-        <CardHeader>
-          <div className="flex flex-row justify-between">
-            <div className="flex w-1/2 items-center">
-              <Image
-                src="/images/green.png"
-                alt="Stasis"
-                className="h-12 w-12"
-                width={48}
-                height={48}
-              />
-              <CardTitle className="text-3xl font-normal">statis</CardTitle>
-            </div>
-            <div className="flex w-1/2 flex-col gap-2">
-              <CardTitle className="font-normal">Preview</CardTitle>
-              <CardDescription>
-                Your uploaded content will appear here
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-row justify-between">
-            {/* Left Column: Info & Action */}
-            <div className="flex w-1/2 flex-col justify-between space-y-2 pb-3 text-sm text-muted-foreground">
-              <p className="ml-3 max-w-md">
-                AI-generated content may contain errors. Review before use. Only
-                upload content you own and generated content must be for
-                personal use only.
-              </p>
-              <Button
-                onClick={handleGenerateCards}
-                disabled={!uploadedFile}
-                variant="ghost"
-                className={`w-40 items-center rounded-xl ${!uploadedFile ? 'text-[#191919]' : 'bg-[#191919] text-white hover:bg-[#252525]'}`}
-              >
-                <Icon icon="carbon:ai-generate" className="mr-0.5 h-4 w-4" />
-                Generate Cards
-              </Button>
-            </div>
-
-            {/* Right Column: Dynamic Preview Area */}
-            <div className="flex flex-1 flex-col overflow-hidden rounded-lg border border-[#4a4a46]/50 bg-[#0f0f0f] bg-[#191919]">
-              {uploadedFile ? (
-                <div className="flex h-full flex-col space-y-4 p-4">
-                  {/* File Info Header */}
-                  <div className="flex items-start gap-4 rounded-lg border border-[#4a4a46]/30 bg-[#161616] p-4">
-                    <Icon
-                      icon="bi:file-earmark-text"
-                      className="h-10 w-10 text-primary"
-                    />
-                    <div className="flex-1 overflow-hidden">
-                      <h4 className="truncate font-semibold text-white">
-                        {uploadedFile.fileName}
-                      </h4>
-                      <p className="text-xs text-muted-foreground">
-                        {formatFileSize(uploadedFile.fileSize)} •{' '}
-                        {uploadedFile.fileType}
-                      </p>
-                      <p className="mt-1 truncate text-[10px] text-muted-foreground/50">
-                        Path: {uploadedFile.path}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Content Preview */}
-                  <div className="min-h-[300px] flex-1 overflow-auto">
-                    {uploadedFile.fileType === 'application/pdf' && (
-                      <iframe
-                        src={uploadedFile.publicUrl}
-                        className="h-full w-full rounded-lg border border-[#4a4a46]/30"
-                        title="PDF Preview"
-                      />
-                    )}
-                    {uploadedFile.fileType.startsWith('image/') && (
-                      <div className="flex justify-center rounded-lg border border-[#4a4a46]/30 bg-[#161616] p-2">
-                        <Image
-                          src={uploadedFile.publicUrl}
-                          alt="Uploaded preview"
-                          className="max-h-80 w-auto rounded-lg object-contain"
-                          width={320}
-                          height={320}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                /* Original Empty State */
-                <div className="flex h-full flex-col items-center justify-center py-12 text-center">
-                  <Icon
-                    icon="bi:file-earmark"
-                    className="mb-4 h-12 w-12 text-muted-foreground/50"
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    No file uploaded yet
+      <FeatureFooterCard
+        title="Preview"
+        description="Your uploaded content will appear here"
+        leftContent={
+          <>
+            <p className="ml-3 max-w-md">
+              AI-generated content may contain errors. Review before use. Only
+              upload content you own and generated content must be for personal
+              use only.
+            </p>
+            <Button
+              onClick={handleGenerateCards}
+              disabled={!uploadedFile}
+              variant="ghost"
+              className={`w-40 items-center rounded-xl ${!uploadedFile ? 'text-[#191919]' : 'bg-[#191919] text-white hover:bg-[#252525]'}`}
+            >
+              <Icon icon="carbon:ai-generate" className="mr-0.5 h-4 w-4" />
+              Generate Cards
+            </Button>
+          </>
+        }
+        rightContent={
+          uploadedFile ? (
+            <div className="flex h-full flex-col space-y-4 p-4">
+              <div className="flex items-start gap-4 rounded-lg border border-[#4a4a46]/30 bg-[#161616] p-4">
+                <Icon
+                  icon="bi:file-earmark-text"
+                  className="h-10 w-10 text-primary"
+                />
+                <div className="flex-1 overflow-hidden">
+                  <h4 className="truncate font-semibold text-white">
+                    {uploadedFile.fileName}
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    {formatFileSize(uploadedFile.fileSize)} •{' '}
+                    {uploadedFile.fileType}
+                  </p>
+                  <p className="mt-1 truncate text-[10px] text-muted-foreground/50">
+                    Path: {uploadedFile.path}
                   </p>
                 </div>
-              )}
+              </div>
+
+              <div className="min-h-[300px] flex-1 overflow-auto">
+                {uploadedFile.fileType === 'application/pdf' && (
+                  <iframe
+                    src={uploadedFile.publicUrl}
+                    className="h-full w-full rounded-lg border border-[#4a4a46]/30"
+                    title="PDF Preview"
+                  />
+                )}
+                {uploadedFile.fileType.startsWith('image/') && (
+                  <div className="flex justify-center rounded-lg border border-[#4a4a46]/30 bg-[#161616] p-2">
+                    <Image
+                      src={uploadedFile.publicUrl}
+                      alt="Uploaded preview"
+                      className="max-h-80 w-auto rounded-lg object-contain"
+                      width={320}
+                      height={320}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center py-12 text-center">
+              <Icon
+                icon="bi:file-earmark"
+                className="mb-4 h-12 w-12 text-muted-foreground/50"
+              />
+              <p className="text-sm text-muted-foreground">
+                No file uploaded yet
+              </p>
+            </div>
+          )
+        }
+      />
     </div>
   );
 }

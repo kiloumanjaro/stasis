@@ -7,21 +7,6 @@ import { InfoIcon } from 'lucide-react';
 import { Suspense } from 'react';
 
 async function UserDetails() {
-  if (process.env.SKIP_AUTH === 'true') {
-    return JSON.stringify(
-      {
-        id: 'demo-user',
-        userId: 'demo-user',
-        email: 'demo@example.com',
-        name: 'Demo User',
-        pictureUrl: '',
-        note: 'Auth bypassed - mock user data',
-      },
-      null,
-      2
-    );
-  }
-
   const cookieStore = await cookies();
   const cookieHeader = cookieStore
     .getAll()

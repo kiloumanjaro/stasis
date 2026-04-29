@@ -4,6 +4,9 @@
 
 @layer base {
   :root {
+    --app-sidebar-width: 0px;
+    --app-mobile-nav-height: 56px;
+
     /* Light Mode - Warm Neutral Gray Scheme (from UploadContent) */
     /* Backgrounds */
     --background: 60 2% 96%; /* #f5f5f3 - warm off-white */
@@ -52,6 +55,12 @@
     /* Radius */
     --radius: 0.75rem;
   }
+  @media (min-width: 768px) {
+    :root {
+      --app-sidebar-width: 64px;
+      --app-mobile-nav-height: 0px;
+    }
+  }
   .dark {
     /* Dark Mode - Warm Neutral Gray Scheme (from UploadContent) */
     /* Backgrounds */
@@ -97,6 +106,27 @@
     --chart-3: 60 1% 57%; /* #91918d */
     --chart-4: 60 3% 28%; /* #4a4a46 */
     --chart-5: 48 3% 18%; /* #30302e */
+  }
+}
+
+@layer components {
+  .app-shell {
+    padding-bottom: var(--app-mobile-nav-height);
+  }
+
+  @media (min-width: 768px) {
+    .app-shell {
+      padding-left: var(--app-sidebar-width);
+    }
+  }
+
+  .app-shell-main,
+  .app-shell-page {
+    min-width: 0;
+  }
+
+  .app-shell-page {
+    width: 100%;
   }
 }
 
