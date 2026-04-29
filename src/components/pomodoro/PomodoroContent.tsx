@@ -11,6 +11,7 @@ import {
   TimerWidget,
   WidgetToggleBar,
 } from './widgets';
+import { useCameraContextSafe } from '@/features/camera/context/CameraContext';
 
 type WidgetType = 'camera' | 'timer' | 'monitor' | 'addFlashcards';
 
@@ -118,6 +119,16 @@ export function PomodoroContent({
 
     return () => window.removeEventListener('resize', syncWidgetPositions);
   }, []);
+
+  const camera = useCameraContextSafe();
+  const isCameraActive = camera?.isCameraActive ?? false;
+  useEffect(() => {
+    if (!isCameraActive) return;
+    setWidgets((prev) =>
+      prev.camera.isOpen ? prev : { ...prev, camera: { isOpen: true } }
+    );
+    setActiveWidget('camera');
+  }, [isCameraActive]);
 
   // Toggle widget visibility
   const toggleWidget = useCallback((widget: WidgetType) => {
