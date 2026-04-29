@@ -4,13 +4,14 @@
 
 import { Sidebar } from '@/components/app/Sidebar';
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { getBackendUser, type BackendAuthUser } from '@/lib/backend-auth';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<BackendAuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     let isMounted = true;
@@ -31,6 +32,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         }
 
         setUser(currentUser);
+
+        const onboardingRes = await fetch('/api/onboarding/check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ currentPath: pathname }),
+        });
+        if (onboardingRes.ok && isMounted) {
+          const { redirectPath } = (await onboardingRes.json()) as {
+            redirectPath: string | null;
+          };
+          if (redirectPath) {
+            router.push(redirectPath);
+            return;
+          }
+        }
+
         setLoading(false);
       } catch (error) {
         console.error('Error verifying authenticated user:', error);
@@ -44,13 +61,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         router.replace('/auth/sign-up');
       }
     };
-
     void syncAuthState();
 
     return () => {
       isMounted = false;
     };
-  }, [router]);
+  }, [router, pathname]);
 
   if (loading) {
     return (

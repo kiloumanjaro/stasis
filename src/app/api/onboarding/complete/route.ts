@@ -1,15 +1,15 @@
+import { getBackendUser } from '@/lib/backend-auth';
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
-export async function POST() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export async function POST(request: Request) {
+  const user = await getBackendUser(request.headers.get('cookie') ?? '');
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const supabase = await createClient();
 
   const { error } = await supabase
     .from('user_profiles')

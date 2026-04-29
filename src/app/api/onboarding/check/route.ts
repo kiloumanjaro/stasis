@@ -1,3 +1,4 @@
+import { getBackendUser } from '@/lib/backend-auth';
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
@@ -6,15 +7,13 @@ type OnboardingCheckRequest = {
 };
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getBackendUser(request.headers.get('cookie') ?? '');
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const supabase = await createClient();
   const body = (await request
     .json()
     .catch(() => ({}))) as OnboardingCheckRequest;
