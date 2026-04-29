@@ -9,6 +9,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "type-check": "tsc --noEmit",
+    "check:boundary": "ts-node scripts/check-backend-boundary.ts",
     "prepare": "husky"
   },
   "dependencies": {
@@ -57,7 +58,13 @@
     "prettier-plugin-tailwindcss": "^0.7.2",
     "tailwindcss": "^3.4.1",
     "tailwindcss-animate": "^1.0.7",
+    "ts-node": "^10.9.2",
     "typescript": "^5"
+  },
+  "ts-node": {
+    "compilerOptions": {
+      "module": "commonjs"
+    }
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
