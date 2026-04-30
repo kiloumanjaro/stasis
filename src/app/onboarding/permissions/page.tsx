@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, Camera, Cpu, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { saveOnboardingState } from '@/lib/frontend-store';
 
 export default function PermissionsPage() {
   const router = useRouter();
@@ -39,29 +40,20 @@ export default function PermissionsPage() {
 
     streamRef.current = mediaStream;
     setSaving(true);
-    const res = await fetch('/api/onboarding/cv-consent', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled: true }),
-    });
-    setSaving(false);
-
-    if (!res.ok) {
+    try {
+      saveOnboardingState({ cvMonitoringEnabled: true });
+      setGranted(true);
+    } catch {
       setError('Failed to save. Please try again.');
       mediaStream.getTracks().forEach((track) => track.stop());
-      return;
+    } finally {
+      setSaving(false);
     }
-
-    setGranted(true);
   };
 
   const handleSkip = async () => {
     setSaving(true);
-    await fetch('/api/onboarding/cv-consent', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled: false }),
-    });
+    saveOnboardingState({ cvMonitoringEnabled: false });
     router.push('/onboarding/complete');
   };
 

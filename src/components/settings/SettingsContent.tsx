@@ -1,19 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
 
-import {
-  deleteAccountAction,
-  exportUserDataAction,
-  saveSettingsProfile,
-  updateDisplayNameAction,
-  updatePasswordAction,
-  type CompletionSound,
-  type DefaultCardSort,
-  type GazeSensitivity,
-  type SettingsProfile,
-} from '@/lib/settings-actions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,6 +9,19 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { getBackendUser } from '@/lib/backend-auth';
+import {
+  clearFrontendAppState,
+  DEFAULT_SETTINGS_PROFILE,
+  readOnboardingState,
+  readPreferenceSummary,
+  readSettingsProfile,
+  saveSettingsProfile,
+  type CompletionSound,
+  type DefaultCardSort,
+  type GazeSensitivity,
+  type SettingsProfile,
+} from '@/lib/frontend-store';
 
 type StatusType = 'idle' | 'success' | 'error';
 
@@ -52,44 +53,52 @@ function toNum(value: unknown, fallback: number) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-export function SettingsContent({
-  initialProfile,
-}: {
-  initialProfile: SettingsProfile;
-}) {
-  const router = useRouter();
-
-  const [settings, setSettings] = useState<SettingsProfile>({
-    focus_goal_minutes: toNum(initialProfile.focus_goal_minutes, 25),
-    break_duration_minutes: toNum(initialProfile.break_duration_minutes, 5),
+function createInitialSettingsState(): SettingsProfile {
+  return {
+    focus_goal_minutes: toNum(DEFAULT_SETTINGS_PROFILE.focus_goal_minutes, 25),
+    break_duration_minutes: toNum(
+      DEFAULT_SETTINGS_PROFILE.break_duration_minutes,
+      5
+    ),
     long_break_duration_minutes: toNum(
-      initialProfile.long_break_duration_minutes,
+      DEFAULT_SETTINGS_PROFILE.long_break_duration_minutes,
       20
     ),
-    daily_goal_cards: toNum(initialProfile.daily_goal_cards, 20),
-    default_card_sort: (initialProfile.default_card_sort ??
+    daily_goal_cards: toNum(DEFAULT_SETTINGS_PROFILE.daily_goal_cards, 20),
+    default_card_sort: (DEFAULT_SETTINGS_PROFILE.default_card_sort ??
       'due_date') as DefaultCardSort,
-    shortcuts_enabled: toBool(initialProfile.shortcuts_enabled, true),
-    cv_monitoring_enabled: toBool(initialProfile.cv_monitoring_enabled, false),
+    shortcuts_enabled: toBool(DEFAULT_SETTINGS_PROFILE.shortcuts_enabled, true),
+    cv_monitoring_enabled: toBool(
+      DEFAULT_SETTINGS_PROFILE.cv_monitoring_enabled,
+      false
+    ),
     burnout_threshold_minutes: toNum(
-      initialProfile.burnout_threshold_minutes,
+      DEFAULT_SETTINGS_PROFILE.burnout_threshold_minutes,
       10
     ),
-    gaze_sensitivity: (initialProfile.gaze_sensitivity ??
+    gaze_sensitivity: (DEFAULT_SETTINGS_PROFILE.gaze_sensitivity ??
       'medium') as GazeSensitivity,
-    display_name: (initialProfile.display_name ?? '').slice(0, 40),
-    heatmap_range_days: (initialProfile.heatmap_range_days ?? 30) as
+    display_name: (DEFAULT_SETTINGS_PROFILE.display_name ?? '').slice(0, 40),
+    heatmap_range_days: (DEFAULT_SETTINGS_PROFILE.heatmap_range_days ?? 30) as
       | 30
       | 60
       | 90,
-    card_animation_enabled: toBool(initialProfile.card_animation_enabled, true),
-    completion_sound: (initialProfile.completion_sound ??
+    card_animation_enabled: toBool(
+      DEFAULT_SETTINGS_PROFILE.card_animation_enabled,
+      true
+    ),
+    completion_sound: (DEFAULT_SETTINGS_PROFILE.completion_sound ??
       'soft_chime') as CompletionSound,
-    reminder_enabled: toBool(initialProfile.reminder_enabled, false),
-    reminder_time: initialProfile.reminder_time ?? '08:00',
-    email: initialProfile.email ?? null,
-  });
+    reminder_enabled: toBool(DEFAULT_SETTINGS_PROFILE.reminder_enabled, false),
+    reminder_time: DEFAULT_SETTINGS_PROFILE.reminder_time ?? '08:00',
+    email: DEFAULT_SETTINGS_PROFILE.email ?? null,
+  };
+}
 
+export function SettingsContent() {
+  const [settings, setSettings] = useState<SettingsProfile>(
+    createInitialSettingsState()
+  );
   const [status, setStatus] = useState<{ type: StatusType; message: string }>({
     type: 'idle',
     message: '',
@@ -110,6 +119,37 @@ export function SettingsContent({
     return () => {
       streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    const storedSettings = readSettingsProfile();
+
+    setSettings((prev) => ({
+      ...prev,
+      ...storedSettings,
+      display_name: (storedSettings.display_name ?? '').slice(0, 40),
+    }));
+
+    void getBackendUser().then((user) => {
+      if (!isMounted || !user) {
+        return;
+      }
+
+      setSettings((prev) => ({
+        ...prev,
+        id: user.id,
+        email: user.email,
+        display_name:
+          prev.display_name && prev.display_name.trim().length > 0
+            ? prev.display_name
+            : user.name,
+      }));
+    });
+
+    return () => {
+      isMounted = false;
     };
   }, []);
 
@@ -168,39 +208,25 @@ export function SettingsContent({
     setStatus({ type: 'idle', message: '' });
 
     startSaving(async () => {
-      const result = await saveSettingsProfile(settings);
-      if (!result.ok) {
-        setStatus({
-          type: 'error',
-          message: result.message ?? 'Could not save settings.',
-        });
-        return;
-      }
-
+      const nextSettings = saveSettingsProfile(settings);
+      setSettings(nextSettings);
       setStatus({
         type: 'success',
-        message: result.message ?? 'Settings updated.',
+        message: 'Settings updated locally on this device.',
       });
-      router.refresh();
     });
   };
 
   const saveDisplayName = () => {
     startSaving(async () => {
-      const result = await updateDisplayNameAction(settings.display_name ?? '');
-      if (!result.ok) {
-        setStatus({
-          type: 'error',
-          message: result.message ?? 'Unable to update display name.',
-        });
-        return;
-      }
-
+      const nextSettings = saveSettingsProfile({
+        display_name: settings.display_name ?? '',
+      });
+      setSettings((prev) => ({ ...prev, ...nextSettings }));
       setStatus({
         type: 'success',
-        message: result.message ?? 'Display name updated.',
+        message: 'Display name updated locally.',
       });
-      router.refresh();
     });
   };
 
@@ -214,38 +240,24 @@ export function SettingsContent({
     setCameraStatus('idle');
 
     startSaving(async () => {
-      const result = await saveSettingsProfile({
+      const nextSettings = saveSettingsProfile({
         ...settings,
         cv_monitoring_enabled: false,
       });
-      if (!result.ok) {
-        setStatus({
-          type: 'error',
-          message: result.message ?? 'Failed to revoke camera access.',
-        });
-        return;
-      }
+      setSettings(nextSettings);
       setStatus({
         type: 'success',
-        message: 'Camera access revoked and monitoring disabled.',
+        message: 'Camera access revoked and monitoring disabled locally.',
       });
-      router.refresh();
     });
   };
 
   const updatePassword = () => {
     startChangingPassword(async () => {
-      const result = await updatePasswordAction(password);
-      if (!result.ok) {
-        setStatus({
-          type: 'error',
-          message: result.message ?? 'Password change failed.',
-        });
-        return;
-      }
       setStatus({
-        type: 'success',
-        message: result.message ?? 'Password changed.',
+        type: 'error',
+        message:
+          'Password changes are managed by your Google account, not this frontend-only app.',
       });
       setPassword('');
     });
@@ -253,16 +265,14 @@ export function SettingsContent({
 
   const exportData = () => {
     startExporting(async () => {
-      const result = await exportUserDataAction();
-      if (!result.ok || !result.data) {
-        setStatus({
-          type: 'error',
-          message: result.message ?? 'Data export failed.',
-        });
-        return;
-      }
+      const exportPayload = {
+        exported_at: new Date().toISOString(),
+        settings: readSettingsProfile(),
+        onboarding: readOnboardingState(),
+        preferenceSummary: readPreferenceSummary(),
+      };
 
-      const blob = new Blob([JSON.stringify(result.data, null, 2)], {
+      const blob = new Blob([JSON.stringify(exportPayload, null, 2)], {
         type: 'application/json',
       });
       const url = URL.createObjectURL(blob);
@@ -276,13 +286,16 @@ export function SettingsContent({
       anchor.click();
       URL.revokeObjectURL(url);
 
-      setStatus({ type: 'success', message: 'Data export downloaded.' });
+      setStatus({
+        type: 'success',
+        message: 'Local app data export downloaded.',
+      });
     });
   };
 
   const deleteAccount = () => {
     const confirmed = window.confirm(
-      'Delete account and all related study data? This cannot be undone.'
+      'Clear local Stasis data stored in this browser? Your Google account will not be deleted.'
     );
 
     if (!confirmed) {
@@ -290,21 +303,16 @@ export function SettingsContent({
     }
 
     startDeletingAccount(async () => {
-      const result = await deleteAccountAction();
-      if (!result.ok) {
-        setStatus({
-          type: 'error',
-          message: result.message ?? 'Could not delete account.',
-        });
-        return;
-      }
-
+      clearFrontendAppState();
+      setSettings((prev) => ({
+        ...createInitialSettingsState(),
+        email: prev.email ?? null,
+      }));
       setStatus({
         type: 'success',
-        message: result.message ?? 'Account deleted.',
+        message:
+          'Local study data cleared. Your authenticated account is unchanged.',
       });
-      router.push('/auth/logout');
-      router.refresh();
     });
   };
 
@@ -699,7 +707,9 @@ export function SettingsContent({
               onClick={deleteAccount}
               disabled={isDeletingAccount}
             >
-              {isDeletingAccount ? 'Deleting account...' : 'Delete account'}
+              {isDeletingAccount
+                ? 'Clearing local data...'
+                : 'Clear local data'}
             </Button>
           </div>
         </CardContent>

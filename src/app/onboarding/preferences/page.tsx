@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { StudyPreferences } from '@/types/onboarding';
+import { saveOnboardingState } from '@/lib/frontend-store';
 
 interface FormErrors {
   focusGoalMinutes?: string;
@@ -52,16 +53,13 @@ export default function OnboardingPreferencesPage() {
       return;
     }
     setSaving(true);
-    const res = await fetch('/api/onboarding/save-preferences', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    });
-    setSaving(false);
-    if (res.ok) {
+    try {
+      saveOnboardingState(form);
       router.push('/onboarding/permissions');
-    } else {
+    } catch {
       setSaveError(true);
+    } finally {
+      setSaving(false);
     }
   };
 

@@ -14,6 +14,7 @@ import type { UserPreferences } from '@/types/preferences';
 import { calculateAdaptiveParameters } from '@/lib/preferences/calculator';
 import { Icon } from '@iconify/react';
 import ModelViewer from '@/components/preferences/ModelViewer';
+import { savePreferenceSummary } from '@/lib/frontend-store';
 import {
   Brain,
   Zap,
@@ -158,29 +159,17 @@ function SummaryPageContent() {
     setSaveError(null);
 
     try {
-      const response = await fetch('/api/preferences', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          scores,
-          adaptiveParams: params,
-        }),
+      savePreferenceSummary({
+        scores,
+        adaptiveParams: params,
+        savedAt: new Date().toISOString(),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        setSaveError(error.error || 'Failed to save preferences');
-        setIsSaving(false);
-        return;
-      }
-
-      // Redirect to upload page
       router.push('/upload');
     } catch (error) {
-      console.error('Error saving preferences:', error);
+      console.error('Error saving preferences locally:', error);
       setSaveError('An error occurred while saving your preferences');
+    } finally {
       setIsSaving(false);
     }
   };

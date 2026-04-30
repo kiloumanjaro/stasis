@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { X, Plus, Check } from 'lucide-react';
+import { createFlashcardDeck, updateFlashcardDeck } from '@/lib/frontend-store';
 
 interface FlashcardEntry {
   question: string;
@@ -190,22 +191,12 @@ export function AddFlashcardsWidget(props: AddFlashcardsWidgetProps) {
 
     try {
       if (props.edit && props.initialDeck?.fcID) {
-        // Update existing deck
-        const response = await fetch('/api/flashcards/update', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fcID: props.initialDeck.fcID,
-            deckTitle: deckTitle.trim(),
-            description: description.trim(),
-            flashcards: validCards,
-          }),
+        updateFlashcardDeck({
+          fcID: props.initialDeck.fcID,
+          deckTitle: deckTitle.trim(),
+          description: description.trim(),
+          flashcards: validCards,
         });
-
-        if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.error || 'Failed to update flashcards');
-        }
 
         // Notify parent and close
         props.onSaved?.();
@@ -213,58 +204,19 @@ export function AddFlashcardsWidget(props: AddFlashcardsWidgetProps) {
         return;
       }
 
-      // Create new deck (existing behavior)
-      const response = await fetch('/api/flashcards/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          deckTitle: deckTitle.trim(),
-          description: description.trim(),
-          flashcards: validCards,
-        }),
+      createFlashcardDeck({
+        deckTitle: deckTitle.trim(),
+        description: description.trim(),
+        flashcards: validCards,
       });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to create flashcards');
-      }
 
       // Success - clear any validation timer and refresh the page to show new deck
       if (submittedTimeoutRef.current) {
         clearTimeout(submittedTimeoutRef.current);
         submittedTimeoutRef.current = null;
       }
-      window.location.reload();
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Failed to create flashcards'
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
-
-    try {
-      const response = await fetch('/api/flashcards/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          deckTitle: deckTitle.trim(),
-          description: description.trim(),
-          flashcards: validCards,
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to create flashcards');
-      }
-
-      // Success - clear any validation timer and refresh the page to show new deck
-      if (submittedTimeoutRef.current) {
-        clearTimeout(submittedTimeoutRef.current);
-        submittedTimeoutRef.current = null;
-      }
-      window.location.reload();
+      props.onSaved?.();
+      props.onClose();
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Failed to create flashcards'

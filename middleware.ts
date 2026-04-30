@@ -1,34 +1,17 @@
-import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+
+import { getBackendUser } from '@/lib/backend-auth';
+
+function serializeCookieHeader(
+  entries: Array<{ name: string; value: string }>
+): string {
+  return entries.map(({ name, value }) => `${name}=${value}`).join('; ');
+}
 
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next({
     request,
   });
-
-  // DEV: auth disabled — Supabase session refresh skipped entirely in dev mode
-  // Re-enable by removing the SKIP_AUTH guard and restoring the auth check below.
-  const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  // DEV: auth disabled — real getUser() call suppressed; mock user injected via server client
-  if (process.env.SKIP_AUTH !== 'true' && SUPABASE_URL && SUPABASE_ANON_KEY) {
-    const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            request.cookies.set(name, value);
-            response.cookies.set(name, value, options);
-          });
-        },
-      },
-    });
-
-    await supabase.auth.getUser();
-  }
 
   // Skip auth check for callback and auth pages
   if (request.nextUrl.pathname.startsWith('/auth/')) {
@@ -55,14 +38,21 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith(path)
   );
 
-  // DEV: auth disabled — redirect-to-login guard commented out
-  // To re-enable auth enforcement, remove the SKIP_AUTH check and uncomment below:
-  // if (isProtectedPath && !user) {
-  //   const redirectUrl = request.nextUrl.clone();
-  //   redirectUrl.pathname = '/auth/sign-up';
-  //   return NextResponse.redirect(redirectUrl);
-  // }
-  void isProtectedPath; // suppress unused-var warning while auth is disabled
+  if (isProtectedPath) {
+    const cookieHeader = serializeCookieHeader(request.cookies.getAll());
+    const user = await getBackendUser(cookieHeader);
+
+    if (!user) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = '/auth/sign-up';
+      redirectUrl.search = '';
+      redirectUrl.searchParams.set(
+        'next',
+        `${request.nextUrl.pathname}${request.nextUrl.search}`
+      );
+      return NextResponse.redirect(redirectUrl);
+    }
+  }
 
   return response;
 }

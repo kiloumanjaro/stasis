@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { FeatureFooterCard } from '@/components/FeatureFooterCard';
 import { Icon } from '@iconify/react';
 import { Upload, FileText, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { createFlashcardDeck } from '@/lib/frontend-store';
 
 const supportedTypes = [
   {
@@ -42,6 +43,35 @@ interface UploadedFile {
   path: string;
   publicUrl: string;
   extractedText?: string;
+}
+
+function buildFlashcardsFromText(text: string, count = 10) {
+  const normalized = text.replace(/\r/g, '').trim();
+  const blocks = normalized
+    .split(/\n\s*\n/)
+    .map((block) => block.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+  const units =
+    blocks.length > 0
+      ? blocks
+      : normalized
+          .split('\n')
+          .map((line) => line.replace(/\s+/g, ' ').trim())
+          .filter(Boolean);
+
+  return units.slice(0, count).map((unit, index) => {
+    const sentences = unit.split(/(?<=[.!?])\s+/).filter(Boolean);
+    const answer = unit;
+    const question =
+      sentences.length > 1
+        ? `What is the key idea in note ${index + 1}?`
+        : `Review note ${index + 1}: ${unit.slice(0, 48)}${unit.length > 48 ? '...' : ''}`;
+
+    return {
+      question,
+      answer,
+    };
+  });
 }
 
 export function UploadContent() {
@@ -118,21 +148,17 @@ export function UploadContent() {
     setSuccess(null);
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
+      const publicUrl = URL.createObjectURL(file);
+      const extractedText = file.type === 'text/plain' ? await file.text() : '';
 
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
+      setUploadedFile({
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        path: file.name,
+        publicUrl,
+        extractedText,
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Upload failed');
-      }
-
-      setUploadedFile(data);
       setFile(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload file');
@@ -154,27 +180,22 @@ export function UploadContent() {
     setSuccess(null);
 
     try {
-      const response = await fetch('/api/flashcards', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          text: uploadedFile.extractedText,
-          deckName: uploadedFile.fileName.replace(/\.[^/.]+$/, ''), // Remove file extension
-          description: `Generated from ${uploadedFile.fileName}`,
-          count: 10,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to generate flashcards');
+      const flashcards = buildFlashcardsFromText(
+        uploadedFile.extractedText,
+        10
+      );
+      if (flashcards.length === 0) {
+        throw new Error('Could not derive any flashcards from this file');
       }
 
+      const deck = createFlashcardDeck({
+        deckTitle: uploadedFile.fileName.replace(/\.[^/.]+$/, ''),
+        description: `Generated locally from ${uploadedFile.fileName}`,
+        flashcards,
+      });
+
       setSuccess(
-        `Successfully generated ${data.cardsGenerated} flashcards in deck "${data.deckName}"!`
+        `Saved ${flashcards.length} local flashcards in deck "${deck.fc_name}".`
       );
     } catch (err) {
       setError(

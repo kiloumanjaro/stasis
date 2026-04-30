@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 
 import type { DailyStats } from '@/lib/dashboard';
+import { readSettingsProfile } from '@/lib/frontend-store';
 
 interface UserGreetingProps {
   displayName: string;
@@ -130,21 +131,27 @@ function getContextLine(dailyStats: DailyStats | null): string {
 
 export function UserGreeting({ displayName, dailyStats }: UserGreetingProps) {
   const [visitCount, setVisitCount] = useState(1);
+  const [resolvedDisplayName, setResolvedDisplayName] = useState(displayName);
 
   useEffect(() => {
     setVisitCount(trackSameDayVisit());
+
+    const storedDisplayName = readSettingsProfile().display_name?.trim();
+    if (storedDisplayName) {
+      setResolvedDisplayName(storedDisplayName);
+    }
   }, []);
 
   const salutation = getSalutation();
   const headingLead = visitCount > 1 ? 'Welcome back' : salutation;
-  const mobileDisplayName = truncateForMobile(displayName);
+  const mobileDisplayName = truncateForMobile(resolvedDisplayName);
   const contextLine = getContextLine(dailyStats);
 
   return (
     <section className="flex min-h-[72px] flex-col justify-center gap-1 rounded-2xl border border-border/60 bg-background/20 px-4 py-4 sm:min-h-[80px] sm:px-6">
       <h1 className="text-2xl font-semibold tracking-tight">
         <span className="sm:hidden">{`${headingLead}, ${mobileDisplayName}`}</span>
-        <span className="hidden sm:inline">{`${headingLead}, ${displayName}`}</span>
+        <span className="hidden sm:inline">{`${headingLead}, ${resolvedDisplayName}`}</span>
       </h1>
       <p className="text-sm text-muted-foreground">{contextLine}</p>
     </section>

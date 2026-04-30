@@ -5,19 +5,10 @@ import '@/styles/globals.css';
 
 // DEV: startup env-var validation — warns loudly if required keys are missing or still placeholders
 const REQUIRED_ENV_VARS: Record<string, string> = {
-  NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
-  NEXT_PUBLIC_SUPABASE_ANON_KEY:
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
+  NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL ?? '',
 };
 
 if (process.env.NODE_ENV === 'development') {
-  console.log(
-    '\n🟡 [STASIS DEV MODE] Running in development — auth disabled, CORS open\n' +
-      '   Mock user: dev@localhost.dev (id: eb00d0b0-848e-4ffe-97b6-6903c829cf22)\n' +
-      '   Seed data:  pnpm db:seed\n' +
-      '   Hot reload: enabled via next dev --turbo\n'
-  );
-
   const PLACEHOLDER_PATTERN = /^(YOUR_|your-|your_)/i;
   const missing = Object.entries(REQUIRED_ENV_VARS)
     .filter(([, v]) => !v || PLACEHOLDER_PATTERN.test(v))

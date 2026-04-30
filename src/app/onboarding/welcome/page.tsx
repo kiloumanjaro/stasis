@@ -5,6 +5,10 @@ import { useRouter } from 'next/navigation';
 import { BookOpen, Timer, Smile } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
+import {
+  markOnboardingComplete,
+  saveOnboardingState,
+} from '@/lib/frontend-store';
 
 const FEATURES = [
   { icon: BookOpen, label: 'AI Flashcards' },
@@ -18,7 +22,8 @@ export default function WelcomePage() {
 
   const handleSkip = async () => {
     setSkipping(true);
-    await fetch('/api/onboarding/skip', { method: 'POST' });
+    saveOnboardingState({ skipped: true });
+    markOnboardingComplete();
     router.push('/dashboard');
   };
 

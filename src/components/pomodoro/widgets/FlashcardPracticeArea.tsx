@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
@@ -17,21 +17,14 @@ import {
   getDueCards,
   areAllCardsMastered,
 } from '@/components/pomodoro/spacedRepetition';
-
-interface CardStateDB {
-  q_id: number;
-  interval_days: number;
-  ease: number;
-  step: number;
-  next_review_at: string;
-  status: string;
-}
-
-interface QuestionDB {
-  q_id: number;
-  question: string;
-  answer: string;
-}
+import {
+  deleteFlashcardDeck as removeFlashcardDeck,
+  getFlashcardDeck,
+  getFlashcardDeckCardStates,
+  listFlashcardDecks,
+  resetFlashcardDeckProgress as resetStoredFlashcardDeckProgress,
+  updateFlashcardState,
+} from '@/lib/frontend-store';
 
 interface Question {
   qID: number;
@@ -104,54 +97,28 @@ export function FlashcardPracticeArea({
     try {
       setIsLoadingDeck(true);
       setError(null);
-      const response = await fetch('/api/flashcards');
-      if (!response.ok) throw new Error('Failed to fetch decks');
-      const data = await response.json();
-      const fetchedDecks = data.flashCards || [];
+      const fetchedDecks = listFlashcardDecks();
       setDecks(fetchedDecks);
 
       // Fetch stats for each deck
       const stats: Record<number, DeckStats> = {};
-      await Promise.all(
-        fetchedDecks.map(async (deck: FlashcardDeck) => {
-          try {
-            const statesResponse = await fetch(
-              `/api/cardstate/deck/${deck.fc_id}`
-            );
-            if (statesResponse.ok) {
-              const statesData = await statesResponse.json();
-              const cardStates: CardState[] = statesData.cardStates.map(
-                (cs: CardStateDB) => ({
-                  qID: cs.q_id,
-                  intervalDays: cs.interval_days,
-                  ease: cs.ease,
-                  step: cs.step,
-                  nextReviewAt: new Date(cs.next_review_at).getTime(),
-                  status: cs.status,
-                })
-              );
+      fetchedDecks.forEach((deck: FlashcardDeck) => {
+        const currentStates = getFlashcardDeckCardStates(deck.fc_id);
+        const dueCards = getDueCards(currentStates, Date.now());
+        const nextCard =
+          currentStates.length > 0
+            ? currentStates.reduce((min, card) =>
+                card.nextReviewAt < min.nextReviewAt ? card : min
+              )
+            : null;
 
-              const now = Date.now();
-              const dueCards = getDueCards(cardStates, now);
-              const nextCard =
-                cardStates.length > 0
-                  ? cardStates.reduce((min, card) =>
-                      card.nextReviewAt < min.nextReviewAt ? card : min
-                    )
-                  : null;
-
-              stats[deck.fc_id] = {
-                fc_id: deck.fc_id,
-                totalCards: cardStates.length,
-                dueCards: dueCards.length,
-                nextCardAt: nextCard ? nextCard.nextReviewAt : null,
-              };
-            }
-          } catch {
-            // Ignore errors for individual decks
-          }
-        })
-      );
+        stats[deck.fc_id] = {
+          fc_id: deck.fc_id,
+          totalCards: currentStates.length,
+          dueCards: dueCards.length,
+          nextCardAt: nextCard ? nextCard.nextReviewAt : null,
+        };
+      });
       setDeckStats(stats);
       setIsLoadingDeck(false);
     } catch (err) {
@@ -166,30 +133,19 @@ export function FlashcardPracticeArea({
       setError(null);
       setSelectedDeck(deck);
 
-      // Fetch questions
-      const questionsResponse = await fetch(`/api/flashcards/${deck.fc_id}`);
-      if (!questionsResponse.ok) throw new Error('Failed to fetch questions');
-      const questionsData = await questionsResponse.json();
-      const fetchedQuestions = questionsData.questions.map((q: QuestionDB) => ({
-        qID: q.q_id,
+      const storedDeck = getFlashcardDeck(deck.fc_id);
+      if (!storedDeck) {
+        throw new Error('Failed to fetch questions');
+      }
+
+      const fetchedQuestions = storedDeck.questions.map((q) => ({
+        qID: q.qID,
         question: q.question,
         answer: q.answer,
       }));
       setQuestions(fetchedQuestions);
 
-      // Fetch card states
-      const statesResponse = await fetch(`/api/cardstate/deck/${deck.fc_id}`);
-      if (!statesResponse.ok) throw new Error('Failed to fetch card states');
-      const statesData = await statesResponse.json();
-      const fetchedStates = statesData.cardStates.map((cs: CardStateDB) => ({
-        qID: cs.q_id,
-        intervalDays: cs.interval_days,
-        ease: cs.ease,
-        step: cs.step,
-        nextReviewAt: new Date(cs.next_review_at).getTime(),
-        status: cs.status,
-      }));
-      setCardStates(fetchedStates);
+      setCardStates(getFlashcardDeckCardStates(deck.fc_id));
 
       setShowDeckPreview(true);
       setIsLoadingDeck(false);
@@ -219,31 +175,8 @@ export function FlashcardPracticeArea({
     try {
       setIsResetting(true);
       setError(null);
-
-      // Reset all cards in the deck
-      const resetPromises = questions.map((q) =>
-        fetch(`/api/cardstate/${q.qID}/reset`, {
-          method: 'POST',
-        })
-      );
-
-      await Promise.all(resetPromises);
-
-      // Reload card states
-      const statesResponse = await fetch(
-        `/api/cardstate/deck/${selectedDeck.fc_id}`
-      );
-      if (!statesResponse.ok) throw new Error('Failed to fetch card states');
-      const statesData = await statesResponse.json();
-      const fetchedStates = statesData.cardStates.map((cs: CardStateDB) => ({
-        qID: cs.q_id,
-        intervalDays: cs.interval_days,
-        ease: cs.ease,
-        step: cs.step,
-        nextReviewAt: new Date(cs.next_review_at).getTime(),
-        status: cs.status,
-      }));
-      setCardStates(fetchedStates);
+      resetStoredFlashcardDeckProgress(selectedDeck.fc_id);
+      setCardStates(getFlashcardDeckCardStates(selectedDeck.fc_id));
       setIsResetting(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to reset deck');
@@ -264,14 +197,7 @@ export function FlashcardPracticeArea({
     try {
       setIsDeleting(true);
       setError(null);
-
-      const res = await fetch(`/api/flashcards/${deck.fc_id}`, {
-        method: 'DELETE',
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to delete deck');
-      }
+      removeFlashcardDeck(deck.fc_id);
 
       // If the deleted deck is currently selected, clear selection
       if (selectedDeck?.fc_id === deck.fc_id) {
@@ -303,63 +229,63 @@ export function FlashcardPracticeArea({
     setAllMastered(mastered);
   }, [cardStates, now]);
 
-  const handleFlip = () => setIsFlipped((f) => !f);
+  const handleFlip = useCallback(() => {
+    setIsFlipped((f) => !f);
+  }, []);
 
-  const handleDifficulty = async (difficulty: Difficulty) => {
-    if (!currentCardState) return;
+  const handleDifficulty = useCallback(
+    async (difficulty: Difficulty) => {
+      if (!currentCardState) return;
 
-    // Show subtract animation
-    setDueCountAnimation('subtract');
-    await new Promise((resolve) => setTimeout(resolve, 300));
+      // Show subtract animation
+      setDueCountAnimation('subtract');
+      await new Promise((resolve) => setTimeout(resolve, 300));
 
-    try {
-      // Update on server
-      const response = await fetch(`/api/cardstate/${currentCardState.qID}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ difficulty }),
-      });
-
-      if (!response.ok) throw new Error('Failed to update card state');
-      const data = await response.json();
-
-      // Update local state
-      const newCardStates = cardStates.map((cs) =>
-        cs.qID === currentCardState.qID ? data.cardState : cs
-      );
-      setCardStates(newCardStates);
-      setIsFlipped(false);
-
-      // Show add animation if card becomes due again
-      const wasDue = currentCardState.nextReviewAt <= now;
-      const isDueNow = data.cardState.nextReviewAt <= Date.now();
-      if (isDueNow && wasDue) {
-        setDueCountAnimation('add');
-        await new Promise((resolve) => setTimeout(resolve, 300));
-      }
-      setDueCountAnimation(null);
-
-      // Move to next due card
-      const updatedDueCards = getDueCards(newCardStates, now);
-      if (updatedDueCards.length > 0) {
-        const nextCard =
-          updatedDueCards.find((card) => card.qID !== currentCardState.qID) ||
-          updatedDueCards[0];
-        setCurrentQID(nextCard.qID);
-        setShowMasteredMessage(false);
-      } else {
-        // All current due cards answered
-        setShowMasteredMessage(true);
-        const soonest = newCardStates.reduce(
-          (min: CardState, card: CardState) =>
-            card.nextReviewAt < min.nextReviewAt ? card : min
+      try {
+        const nextState = updateFlashcardState(
+          currentCardState.qID,
+          difficulty
         );
-        setCurrentQID(soonest.qID);
+
+        // Update local state
+        const newCardStates = cardStates.map((cs) =>
+          cs.qID === currentCardState.qID ? nextState : cs
+        );
+        setCardStates(newCardStates);
+        setIsFlipped(false);
+
+        // Show add animation if card becomes due again
+        const wasDue = currentCardState.nextReviewAt <= now;
+        const isDueNow = nextState.nextReviewAt <= Date.now();
+        if (isDueNow && wasDue) {
+          setDueCountAnimation('add');
+          await new Promise((resolve) => setTimeout(resolve, 300));
+        }
+        setDueCountAnimation(null);
+
+        // Move to next due card
+        const updatedDueCards = getDueCards(newCardStates, now);
+        if (updatedDueCards.length > 0) {
+          const nextCard =
+            updatedDueCards.find((card) => card.qID !== currentCardState.qID) ||
+            updatedDueCards[0];
+          setCurrentQID(nextCard.qID);
+          setShowMasteredMessage(false);
+        } else {
+          // All current due cards answered
+          setShowMasteredMessage(true);
+          const soonest = newCardStates.reduce(
+            (min: CardState, card: CardState) =>
+              card.nextReviewAt < min.nextReviewAt ? card : min
+          );
+          setCurrentQID(soonest.qID);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to update card');
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update card');
-    }
-  };
+    },
+    [cardStates, currentCardState, now]
+  );
 
   useEffect(() => {
     if (!shortcutsEnabled) {

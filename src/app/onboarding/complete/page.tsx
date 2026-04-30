@@ -4,6 +4,10 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle, Timer, Clock, LayoutGrid, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  markOnboardingComplete,
+  readOnboardingState,
+} from '@/lib/frontend-store';
 
 interface ProfileSummary {
   focus_goal_minutes: number;
@@ -18,14 +22,18 @@ export default function CompletePage() {
   const [completing, setCompleting] = useState(false);
 
   useEffect(() => {
-    fetch('/api/onboarding/summary')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: ProfileSummary | null) => setProfile(data));
+    const onboarding = readOnboardingState();
+    setProfile({
+      focus_goal_minutes: onboarding.focusGoalMinutes,
+      break_duration_minutes: onboarding.breakDurationMinutes,
+      daily_goal_cards: onboarding.dailyGoalCards,
+      cv_monitoring_enabled: onboarding.cvMonitoringEnabled,
+    });
   }, []);
 
   const handleComplete = async () => {
     setCompleting(true);
-    await fetch('/api/onboarding/complete', { method: 'POST' });
+    markOnboardingComplete();
     router.push('/dashboard');
   };
 

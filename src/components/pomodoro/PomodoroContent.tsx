@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { getAppShellViewportInsets } from '@/lib/app-shell';
+import { getFlashcardDeck } from '@/lib/frontend-store';
 import {
   AddFlashcardsWidget,
   CameraWidget,
@@ -66,18 +67,17 @@ export function PomodoroContent({
     fc_name: string;
     description?: string;
   }) => {
-    // Fetch questions for this deck
     try {
-      const res = await fetch(`/api/flashcards/${deck.fc_id}`);
-      if (!res.ok) throw new Error('Failed to fetch deck questions');
-      const data = await res.json();
-      const flashcards = data.questions.map(
-        (q: { q_id: number; question: string; answer: string }) => ({
-          question: q.question,
-          answer: q.answer,
-          id: `${q.q_id}`,
-        })
-      );
+      const storedDeck = getFlashcardDeck(deck.fc_id);
+      if (!storedDeck) {
+        throw new Error('Failed to fetch deck questions');
+      }
+
+      const flashcards = storedDeck.questions.map((q) => ({
+        question: q.question,
+        answer: q.answer,
+        id: `${q.qID}`,
+      }));
 
       setEditPayload({
         fcID: deck.fc_id,
