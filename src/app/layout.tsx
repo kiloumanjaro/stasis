@@ -18,7 +18,8 @@ if (process.env.NODE_ENV === 'development') {
     console.warn(
       '\n⚠️  [STASIS DEV] Missing or placeholder environment variables:\n' +
         missing.map((k) => `   • ${k}`).join('\n') +
-        '\n   Copy .env.example → .env.local and fill in real values.\n'
+        '\n   Add them to .env.local before starting the frontend.\n' +
+        '   For local backend auth, set NEXT_PUBLIC_BACKEND_URL=http://localhost:8000.\n'
     );
   }
 }
