@@ -5,7 +5,6 @@ import { getBackendBaseUrl, getBackendLogoutContext } from '@/lib/backend-auth';
 export async function POST(request: NextRequest) {
   const origin = request.nextUrl.origin;
   const cookieHeader = request.headers.get('cookie') ?? '';
-  const response = NextResponse.redirect(new URL('/auth/sign-up', origin));
 
   try {
     const { csrfToken, cookieHeader: backendCookieHeader } =
@@ -37,18 +36,5 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  response.cookies.set('access_token', '', {
-    path: '/',
-    maxAge: 0,
-  });
-  response.cookies.set('refresh_token', '', {
-    path: '/',
-    maxAge: 0,
-  });
-  response.cookies.set('csrf_token', '', {
-    path: '/',
-    maxAge: 0,
-  });
-
-  return response;
+  return NextResponse.redirect(new URL('/auth/sign-up', origin));
 }
