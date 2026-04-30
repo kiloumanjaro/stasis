@@ -20,6 +20,11 @@ interface BackendAuthResponse {
   csrfToken?: string;
 }
 
+interface BackendLogoutContext {
+  csrfToken: string;
+  cookieHeader: string;
+}
+
 export function getBackendBaseUrl() {
   return (
     process.env.NEXT_PUBLIC_BACKEND_URL?.trim().replace(/\/$/, '') ||
@@ -89,10 +94,69 @@ export async function getBackendUser(cookieHeader?: string) {
   return normalizeBackendUser(data.user);
 }
 
-export async function getBackendLogoutToken() {
+function extractSetCookieHeaders(headers: Headers): string[] {
+  const nodeHeaders = headers as Headers & {
+    getSetCookie?: () => string[];
+  };
+
+  if (typeof nodeHeaders.getSetCookie === 'function') {
+    return nodeHeaders.getSetCookie();
+  }
+
+  const setCookie = headers.get('set-cookie');
+  return setCookie ? [setCookie] : [];
+}
+
+function mergeCookieHeaders(
+  cookieHeader: string | undefined,
+  setCookieHeaders: string[]
+) {
+  const cookies = new Map<string, string>();
+
+  const addCookie = (cookie: string) => {
+    const [nameValue] = cookie.split(';');
+    const separatorIndex = nameValue.indexOf('=');
+
+    if (separatorIndex <= 0) {
+      return;
+    }
+
+    const name = nameValue.slice(0, separatorIndex).trim();
+    const value = nameValue.slice(separatorIndex + 1).trim();
+
+    if (!name) {
+      return;
+    }
+
+    cookies.set(name, value);
+  };
+
+  cookieHeader?.split(/;\s*/).forEach((cookie) => {
+    if (cookie) {
+      addCookie(cookie);
+    }
+  });
+
+  setCookieHeaders.forEach(addCookie);
+
+  return Array.from(cookies.entries())
+    .map(([name, value]) => `${name}=${value}`)
+    .join('; ');
+}
+
+export async function getBackendLogoutContext(
+  cookieHeader?: string
+): Promise<BackendLogoutContext> {
+  const headers = new Headers();
+
+  if (cookieHeader) {
+    headers.set('Cookie', cookieHeader);
+  }
+
   const response = await fetch(`${getBackendBaseUrl()}/auth/csrf`, {
     cache: 'no-store',
-    credentials: 'include',
+    credentials: cookieHeader ? 'same-origin' : 'include',
+    headers,
   });
 
   if (!response.ok) {
@@ -105,5 +169,16 @@ export async function getBackendLogoutToken() {
     throw new Error('Backend did not return a CSRF token');
   }
 
-  return data.csrfToken;
+  return {
+    csrfToken: data.csrfToken,
+    cookieHeader: mergeCookieHeaders(
+      cookieHeader,
+      extractSetCookieHeaders(response.headers)
+    ),
+  };
+}
+
+export async function getBackendLogoutToken(cookieHeader?: string) {
+  const { csrfToken } = await getBackendLogoutContext(cookieHeader);
+  return csrfToken;
 }
