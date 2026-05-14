@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Combobox } from '@/components/ui/combobox';
 import { Footer } from '@/components/dashboard/Footer';
 import { Icon } from '@iconify/react';
 import { Upload, FileText, CheckCircle2, Loader2 } from 'lucide-react';
@@ -35,6 +36,12 @@ const supportedTypes = [
     description:
       'An image capture of your screen used to quickly share visual information or issues',
   },
+];
+
+const sortOptions = [
+  { value: 'Date Uploaded', label: 'Date Uploaded' },
+  { value: 'Recent Activity', label: 'Recent Activity' },
+  { value: 'File Type', label: 'File Type' },
 ];
 
 interface UploadedFile {
@@ -81,6 +88,7 @@ export function UploadContent() {
   const [uploadedFile, setUploadedFile] = useState<UploadedFile | null>(null);
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [sortBy, setSortBy] = useState('Date Uploaded');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (selectedFile: File) => {
@@ -368,6 +376,32 @@ export function UploadContent() {
           ))}
         </div>
       </div>
+
+      <section className="space-y-4">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <h2 className="text-lg">Upload Files</h2>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+            <span className="text-sm text-[#91918d]">Sort By</span>
+            <Combobox
+              value={sortBy}
+              onChange={setSortBy}
+              options={sortOptions}
+            />
+          </div>
+        </div>
+
+        <div className="flex min-h-[320px] items-center justify-center rounded-lg p-6 text-center">
+          <div className="flex flex-col items-center gap-3">
+            <Icon icon="bi:inbox" className="h-10 w-10 text-[#91918d]" />
+            <div>
+              <p className="text-base text-white">No files uploaded yet</p>
+              <p className="text-sm text-[#91918d]">
+                Upload a file above to get started
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* TODO: integrate title/description into page content above */}
       {/*
