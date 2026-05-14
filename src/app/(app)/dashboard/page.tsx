@@ -1,5 +1,5 @@
 import { DashboardContent } from '@/components/dashboard/DashboardContent';
-import { DashboardFooter } from '@/components/dashboard/DashboardFooter';
+import { Footer } from '@/components/dashboard/Footer';
 import { UserGreeting } from '@/components/dashboard/UserGreeting';
 import { getDashboardGreetingData } from '@/lib/dashboard';
 
@@ -15,7 +15,7 @@ export default async function DashboardPage() {
         dailyStats={dailyStats}
       />
       <DashboardContent />
-      <DashboardFooter />
+      <Footer />
     </div>
   );
 }

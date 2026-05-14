@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 
-import { DashboardFootnote } from '@/components/dashboard/DashboardFootnote';
+import { Footnote } from '@/components/dashboard/Footnote';
 import { Card, CardContent, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
@@ -29,11 +29,11 @@ const footerSections = [
   },
 ] as const;
 
-interface DashboardFooterProps {
+interface FooterProps {
   className?: string;
 }
 
-export function DashboardFooter({ className }: DashboardFooterProps) {
+export function Footer({ className }: FooterProps) {
   return (
     <footer>
       <Card className={cn('border-none bg-[#0f0f0f] px-4 py-2', className)}>
@@ -91,7 +91,7 @@ export function DashboardFooter({ className }: DashboardFooterProps) {
             </div>
           </div>
 
-          <DashboardFootnote />
+          <Footnote />
         </CardContent>
       </Card>
     </footer>
