@@ -30,7 +30,7 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
-  title: 'Stasis — v2.0 Dev',
+  title: 'Stasis',
   description: 'AI-powered study companion',
 };
 
