@@ -35,8 +35,8 @@ const stats = [
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 const HEATMAP_LEVEL_OPACITY = [0.08, 0.24, 0.42, 0.6, 0.82] as const;
-const HEATMAP_CELL_SIZE = '2.125rem';
-const HEATMAP_GAP = '0.75rem';
+const HEATMAP_CELL_SIZE = 'clamp(1.2rem, 3.8vw, 2.125rem)';
+const HEATMAP_GAP = 'clamp(0.24rem, 1.2vw, 0.55rem)';
 
 interface StudyActivityHeatmapProps {
   activityData: Record<string, number>;
@@ -148,15 +148,16 @@ export function StudyActivityHeatmap({
   }
 
   const weekCount = days.length / 7;
+  const gridWidth = `calc((7 * ${HEATMAP_CELL_SIZE}) + (6 * ${HEATMAP_GAP}))`;
 
   return (
-    <div className="w-fit space-y-4 p-4 sm:p-5">
-      <div className="space-y-2">
+    <div className="w-full overflow-x-auto px-1 pb-1">
+      <div className="min-w-fit space-y-4 p-3 sm:p-5">
         <div
           className="grid grid-cols-7 justify-items-center text-center text-[10px] uppercase tracking-[0.16em] text-muted-foreground"
           style={{
             columnGap: HEATMAP_GAP,
-            width: `calc((7 * ${HEATMAP_CELL_SIZE}) + (6 * ${HEATMAP_GAP}))`,
+            width: gridWidth,
           }}
         >
           {DAY_LABELS.map((day) => (
@@ -170,7 +171,7 @@ export function StudyActivityHeatmap({
           className="grid grid-cols-7"
           style={{
             gap: HEATMAP_GAP,
-            width: `calc((7 * ${HEATMAP_CELL_SIZE}) + (6 * ${HEATMAP_GAP}))`,
+            width: gridWidth,
             gridTemplateRows: `repeat(${weekCount}, minmax(0, 1fr))`,
           }}
         >
@@ -211,9 +212,14 @@ export function DashboardContent() {
 
   return (
     <div className="space-y-8">
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {stats.map((stat) => (
-          <Card key={stat.title}>
+          <Card
+            key={stat.title}
+            className={
+              stat.title === 'Time Spent' ? 'md:col-span-2 xl:col-span-1' : ''
+            }
+          >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">
                 {stat.title}
@@ -228,10 +234,8 @@ export function DashboardContent() {
             </CardContent>
           </Card>
         ))}
-      </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
+        <Card className="md:col-span-2 xl:col-span-1">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium">{monthLabel}</CardTitle>
             <p className="text-xs text-muted-foreground">
@@ -243,7 +247,7 @@ export function DashboardContent() {
           </CardContent>
         </Card>
 
-        <Card className="border border-[#4a4a46] bg-[#30302e] transition-colors md:col-span-2">
+        <Card className="border border-[#4a4a46] bg-[#30302e] transition-colors md:col-span-2 xl:col-span-2">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-white">
               Recent Activity
@@ -253,7 +257,7 @@ export function DashboardContent() {
             </p>
           </CardHeader>
           <CardContent>
-            <div className="flex min-h-[18rem] flex-col items-center justify-center rounded-lg border border-[#4a4a46] bg-[#2a2a28] px-6 py-12 text-center sm:px-8">
+            <div className="flex min-h-[18rem] flex-col items-center justify-center rounded-lg px-6 py-12 text-center sm:px-8">
               <BookOpenIcon className="mb-4 h-12 w-12 text-white/45" />
               <p className="text-sm text-white/70">
                 No activity yet. Your completed study sessions and milestones
