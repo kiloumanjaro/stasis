@@ -9,7 +9,6 @@ import type { LucideIcon } from 'lucide-react';
 import {
   LayoutDashboard,
   LogOut,
-  Map,
   MoreHorizontal,
   Scan,
   Settings,
@@ -21,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { BackendAuthUser } from '@/lib/backend-auth';
 
-const MOBILE_PRIMARY_HREFS = ['/dashboard', '/roadmap', '/pomodoro'] as const;
+const MOBILE_PRIMARY_HREFS = ['/dashboard', '/upload', '/pomodoro'] as const;
 const MOBILE_PRIMARY_HREF_SET = new Set<string>(MOBILE_PRIMARY_HREFS);
 
 type NavItem = {
@@ -33,7 +32,6 @@ type NavItem = {
 const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/upload', label: 'Upload', icon: Upload },
-  { href: '/roadmap', label: 'Roadmap', icon: Map },
   { href: '/pomodoro', label: 'Pomodoro', icon: Timer },
   { href: '/cv', label: 'Emotion AI', icon: Scan },
   { href: '/settings', label: 'Settings', icon: Settings },

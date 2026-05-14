@@ -5,7 +5,7 @@ import * as faceapi from 'face-api.js';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Camera, CameraOff, Loader2 } from 'lucide-react';
-import { FeatureFooterCard } from '@/components/FeatureFooterCard';
+import { Footer } from '@/components/dashboard/Footer';
 
 interface EmotionData {
   neutral: number;
@@ -188,8 +188,8 @@ export function CVContent() {
   };
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="mb-6">
+    <div className="space-y-6">
+      <div>
         <h1 className="text-2xl">Emotion Recognition</h1>
       </div>
 
@@ -303,28 +303,37 @@ export function CVContent() {
         </Card>
       </div>
 
-      <FeatureFooterCard
-        title="How it works"
-        description="The technology used for this product is indicated here"
-        className="mt-6"
-        leftContent={
-          <p className="ml-3 max-w-md">
-            This application processes webcam images locally in your browser for
-            real-time emotion analysis only. No images or video are stored,
-            saved, or transmitted to any server at any time.
-          </p>
-        }
-        rightContent={
-          <div className="flex h-full flex-col items-center justify-center px-10 py-12 text-center">
-            <p className="text-sm text-muted-foreground">
-              This demo uses <strong>face-api.js</strong>, a JavaScript face
-              recognition library built on top of TensorFlow.js. It detects
-              faces in real-time from your webcam feed and analyzes facial
-              expressions to determine emotions.
-            </p>
+      <section className="cv-footer-details">
+        <div className="flex flex-col gap-6 md:flex-row md:justify-between">
+          <div className="flex flex-col gap-6 md:w-1/2">
+            <div className="flex flex-col justify-between space-y-2 pb-3 text-sm text-muted-foreground">
+              <p className="ml-3 max-w-md">
+                This application processes webcam images locally in your browser
+                for real-time emotion analysis only. No images or video are
+                stored, saved, or transmitted to any server at any time.
+              </p>
+            </div>
           </div>
-        }
-      />
+          <div className="flex flex-1 flex-col gap-6">
+            <div className="flex h-full flex-col items-center justify-center rounded-lg border border-[#4a4a46]/50 bg-[#191919] px-10 py-12 text-center">
+              <p className="text-sm text-muted-foreground">
+                This demo uses <strong>face-api.js</strong>, a JavaScript face
+                recognition library built on top of TensorFlow.js. It detects
+                faces in real-time from your webcam feed and analyzes facial
+                expressions to determine emotions.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* TODO: integrate title/description into page content above */}
+      {/*
+      title="How it works"
+      description="The technology used for this product is indicated here"
+      className="mt-6"
+      */}
+      <Footer />
     </div>
   );
 }

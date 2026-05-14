@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Geist } from 'next/font/google';
 import { ThemeProvider } from 'next-themes';
+import { Toaster } from '@/components/ui/sonner';
 import '@/styles/globals.css';
 
 // DEV: startup env-var validation — warns loudly if required keys are missing or still placeholders
@@ -30,7 +31,7 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
-  title: 'Stasis — v2.0 Dev',
+  title: 'Stasis',
   description: 'AI-powered study companion',
 };
 
@@ -57,6 +58,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {children}
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>

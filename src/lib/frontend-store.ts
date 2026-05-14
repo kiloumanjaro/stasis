@@ -231,18 +231,6 @@ export function readPreferenceSummary(): PreferenceSummaryState | null {
   return value ?? null;
 }
 
-export function savePreferenceSummary(summary: PreferenceSummaryState) {
-  writeJson(PREFERENCE_SUMMARY_STORAGE_KEY, summary);
-}
-
-export function clearPreferenceSummary() {
-  if (!canUseBrowserStorage()) {
-    return;
-  }
-
-  window.localStorage.removeItem(PREFERENCE_SUMMARY_STORAGE_KEY);
-}
-
 export function readFlashcardStore(): FlashcardStore {
   const rawStore = readJson<FlashcardStore>(
     FLASHCARD_STORAGE_KEY,

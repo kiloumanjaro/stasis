@@ -7,6 +7,7 @@ import { readSettingsProfile } from '@/lib/frontend-store';
 
 interface UserGreetingProps {
   displayName: string;
+  pictureUrl: string | null;
   dailyStats: DailyStats | null;
 }
 
@@ -43,6 +44,38 @@ function truncateForMobile(displayName: string): string {
   }
 
   return `${displayName.slice(0, maxLength - 3)}...`;
+}
+
+function getFirstName(displayName: string): string {
+  const [firstName] = displayName.trim().split(/\s+/).filter(Boolean);
+  return firstName || 'Learner';
+}
+
+function resolveDisplayName(
+  baseDisplayName: string,
+  storedDisplayName?: string | null
+) {
+  const stored = storedDisplayName?.trim();
+  if (stored) {
+    return stored;
+  }
+
+  const base = baseDisplayName.trim();
+  if (base) {
+    return base;
+  }
+
+  return 'Learner';
+}
+
+function getInitials(displayName: string): string {
+  const parts = displayName.trim().split(/\s+/).filter(Boolean).slice(0, 2);
+
+  if (parts.length === 0) {
+    return 'S';
+  }
+
+  return parts.map((part) => part.charAt(0).toUpperCase()).join('');
 }
 
 function getTodayKey(date: Date = new Date()): string {
@@ -109,13 +142,16 @@ function trackSameDayVisit(): number {
   return nextTracker.count;
 }
 
-function getContextLine(dailyStats: DailyStats | null): string {
+function getContextLine(
+  resolvedDisplayName: string,
+  dailyStats: DailyStats | null
+): string {
   if (dailyStats?.dailyCardGoalMet && dailyStats.cardsReviewed > 0) {
-    return `Goal hit. You've reviewed all ${dailyStats.cardsReviewed} cards for today.`;
+    return `${resolvedDisplayName}, you've already completed all ${dailyStats.cardsReviewed} cards for today.`;
   }
 
   if (dailyStats?.streakDay && dailyStats.streakDay > 0) {
-    return `Day ${dailyStats.streakDay} streak. Keep it going.`;
+    return `${resolvedDisplayName}, you're on a ${dailyStats.streakDay}-day streak.`;
   }
 
   if (
@@ -123,37 +159,64 @@ function getContextLine(dailyStats: DailyStats | null): string {
     dailyStats.cardsReviewed > 0 &&
     dailyStats.pomodoroSessions === 0
   ) {
-    return `You've reviewed ${dailyStats.cardsReviewed} cards. Start a focus session?`;
+    return `${resolvedDisplayName}, you've reviewed ${dailyStats.cardsReviewed} cards so far. Ready for a focus session?`;
   }
 
-  return "Ready to start today's session?";
+  return `${resolvedDisplayName}, ready to start today's session?`;
 }
 
-export function UserGreeting({ displayName, dailyStats }: UserGreetingProps) {
+export function UserGreeting({
+  displayName,
+  pictureUrl,
+  dailyStats,
+}: UserGreetingProps) {
   const [visitCount, setVisitCount] = useState(1);
-  const [resolvedDisplayName, setResolvedDisplayName] = useState(displayName);
+  const [resolvedDisplayName, setResolvedDisplayName] = useState(
+    resolveDisplayName(displayName)
+  );
 
   useEffect(() => {
     setVisitCount(trackSameDayVisit());
 
-    const storedDisplayName = readSettingsProfile().display_name?.trim();
-    if (storedDisplayName) {
-      setResolvedDisplayName(storedDisplayName);
-    }
-  }, []);
+    const storedDisplayName = readSettingsProfile().display_name;
+    setResolvedDisplayName(resolveDisplayName(displayName, storedDisplayName));
+  }, [displayName]);
 
   const salutation = getSalutation();
   const headingLead = visitCount > 1 ? 'Welcome back' : salutation;
-  const mobileDisplayName = truncateForMobile(resolvedDisplayName);
-  const contextLine = getContextLine(dailyStats);
+  const firstName = getFirstName(resolvedDisplayName);
+  const mobileDisplayName = truncateForMobile(firstName);
+  const contextLine = getContextLine(firstName, dailyStats);
+  const initials = getInitials(resolvedDisplayName);
 
   return (
-    <section className="flex min-h-[72px] flex-col justify-center gap-1 rounded-2xl border border-border/60 bg-background/20 px-4 py-4 sm:min-h-[80px] sm:px-6">
-      <h1 className="text-2xl font-semibold tracking-tight">
-        <span className="sm:hidden">{`${headingLead}, ${mobileDisplayName}`}</span>
-        <span className="hidden sm:inline">{`${headingLead}, ${resolvedDisplayName}`}</span>
-      </h1>
-      <p className="text-sm text-muted-foreground">{contextLine}</p>
+    <section className="flex min-h-[72px] flex-col justify-center gap-3 px-1 py-2 sm:min-h-[88px] sm:px-2">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+          {`${headingLead},`}
+        </h1>
+        <p className="text-3xl font-semibold tracking-tight text-foreground sm:hidden sm:text-4xl">
+          {mobileDisplayName}
+        </p>
+        <p className="hidden text-3xl font-semibold tracking-tight text-foreground sm:block sm:text-4xl">
+          {firstName}
+        </p>
+        <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full text-sm font-semibold text-foreground/90 sm:h-12 sm:w-12">
+          {pictureUrl ? (
+            <img
+              src={pictureUrl}
+              alt={`${resolvedDisplayName} profile`}
+              className="h-full w-full object-cover"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <span>{initials}</span>
+          )}
+        </div>
+      </div>
+      <p className="text-base text-muted-foreground sm:text-lg">
+        {contextLine}
+      </p>
     </section>
   );
 }

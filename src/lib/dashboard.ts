@@ -10,16 +10,17 @@ export interface DailyStats {
 
 export interface DashboardGreetingData {
   displayName: string;
+  pictureUrl: string | null;
   dailyStats: DailyStats | null;
 }
 
 function getEmailPrefix(email: string | null | undefined): string {
   if (!email) {
-    return 'there';
+    return 'Learner';
   }
 
   const [prefix] = email.split('@');
-  return prefix?.trim() || 'there';
+  return prefix?.trim() || 'Learner';
 }
 
 export async function getDashboardGreetingData(): Promise<DashboardGreetingData> {
@@ -27,13 +28,15 @@ export async function getDashboardGreetingData(): Promise<DashboardGreetingData>
 
   if (!user) {
     return {
-      displayName: 'there',
+      displayName: 'Learner',
+      pictureUrl: null,
       dailyStats: null,
     };
   }
 
   return {
     displayName: user.name?.trim() || getEmailPrefix(user.email),
+    pictureUrl: user.pictureUrl?.trim() || null,
     dailyStats: null,
   };
 }

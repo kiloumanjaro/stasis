@@ -1,27 +1,11 @@
 import SignInWithGoogleButton from '@/components/get-started-button';
-import Aurora from '@/components/signup/Aurora';
-import FallingText from '@/components/signup/FallingText';
+import SignupHeroEffects from '@/components/signup/SignupHeroEffects';
 
 export default function LoginPage() {
   return (
     <main className="min-h-screen bg-[#0f0f0f]">
-      <Aurora
-        colorStops={['#7cff67', '#B19EEF', '#5227FF']}
-        blend={0.81}
-        amplitude={10.0}
-        speed={1}
-      />
+      <SignupHeroEffects />
       <div>
-        <FallingText
-          text={`A state of stability and balance between stress and boredom`}
-          highlightWords={['stability', 'balance', 'stress', 'boredom']}
-          trigger="auto"
-          backgroundColor="transparent"
-          wireframes={false}
-          gravity={0.56}
-          fontSize="4rem"
-          mouseConstraintStiffness={0.9}
-        />
         <div className="relative z-10 mt-24 flex w-5/12 flex-col items-center justify-center">
           <div className="flex flex-row">
             <p className="font-roboto text-9xl text-[#fafaf7]">st</p>
