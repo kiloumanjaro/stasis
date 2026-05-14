@@ -1,57 +1,14 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Combobox } from '@/components/ui/combobox';
 import { Footer } from '@/components/dashboard/Footer';
-import { Icon } from '@iconify/react';
-import { Upload, FileText, CheckCircle2, Loader2 } from 'lucide-react';
 import { createFlashcardDeck } from '@/lib/frontend-store';
 import { fsrsClient } from '@/lib/fsrs-client';
 import { toast } from 'sonner';
-
-const supportedTypes = [
-  {
-    icon: 'bi:filetype-pdf',
-    label: 'PDF',
-    description:
-      'A file format that preserves document layout and formatting across all devices.',
-  },
-  {
-    icon: 'bi:filetype-txt',
-    label: 'TXT',
-    description:
-      'A plain text file format that stores unformatted text and is widely supported across all devices.',
-  },
-  {
-    icon: 'bi:image',
-    label: 'Images',
-    description:
-      'An image capture of your screen used to quickly share visual information or issues',
-  },
-];
-
-const sortOptions = [
-  { value: 'Date Uploaded', label: 'Date Uploaded' },
-  { value: 'Recent Activity', label: 'Recent Activity' },
-  { value: 'File Type', label: 'File Type' },
-];
-
-interface UploadedFile {
-  fileName: string;
-  fileSize: number;
-  fileType: string;
-  path: string;
-  publicUrl: string;
-  extractedText?: string;
-}
+import { SupportedFileTypes } from '@/components/upload/SupportedFileTypes';
+import { UploadHistorySection } from '@/components/upload/UploadHistorySection';
+import { UploadZone } from '@/components/upload/UploadZone';
+import type { UploadedFile } from '@/components/upload/types';
 
 function buildFlashcardsFromText(text: string, count = 10) {
   const normalized = text.replace(/\r/g, '').trim();
@@ -275,133 +232,28 @@ export function UploadContent() {
       </div>
 
       {/* Upload Zone */}
-      <Card
-        className={`border border-[#4a4a46] bg-[#30302e] transition-colors ${
-          isDragging ? 'border-primary' : ''
-        }`}
+      <UploadZone
+        file={file}
+        uploadedFile={uploadedFile}
+        uploading={uploading}
+        isDragging={isDragging}
+        primaryButtonLabel={primaryButtonLabel}
+        fileInputRef={fileInputRef}
+        formatFileSize={formatFileSize}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-      >
-        <CardContent className="flex min-h-[280px] flex-col items-center justify-center py-12">
-          <h3 className="mb-1 text-lg font-semibold">
-            Drag and drop your files here
-          </h3>
-          <p className="mb-8 text-xs text-muted-foreground">
-            or click to browse from your computer
-          </p>
-          <input
-            ref={fileInputRef}
-            type="file"
-            className="hidden"
-            accept=".pdf,.txt,.png,.jpg,.jpeg"
-            onChange={handleFileChange}
-          />
-          <Button
-            onClick={handlePrimaryAction}
-            variant="ghost"
-            disabled={uploading}
-            className="w-40 items-center rounded-2xl text-[#191919]"
-          >
-            {uploading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : uploadState === 'uploaded' ? (
-              <Icon icon="carbon:ai-generate" className="h-4 w-4" />
-            ) : (
-              <Upload
-                className={`h-4 w-4 ${
-                  uploadState === 'idle' ? 'text-[#191919]' : ''
-                }`}
-              />
-            )}
-            {primaryButtonLabel}
-          </Button>
-
-          {(file || uploadedFile) && (
-            <div className="mt-6 w-full max-w-md">
-              <div className="rounded-lg border bg-card px-7 py-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <FileText className="h-7 w-7 text-primary" />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">
-                        {uploadedFile?.fileName ?? file?.name}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {formatFileSize(
-                          uploadedFile?.fileSize ?? file?.size ?? 0
-                        )}{' '}
-                        • {uploadedFile?.fileType ?? file?.type}
-                      </p>
-                    </div>
-                  </div>
-                  {uploading && !uploadedFile ? (
-                    <Loader2 className="h-5 w-5 shrink-0 animate-spin text-muted-foreground" />
-                  ) : uploadedFile ? (
-                    <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600 dark:text-green-400" />
-                  ) : null}
-                </div>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        onFileChange={handleFileChange}
+        onPrimaryAction={handlePrimaryAction}
+      />
 
       <p className="text-sm text-muted-foreground">
         AI-generated content may contain errors. Review before use. Only upload
         content you own and generated content must be for personal use only.
       </p>
 
-      {/* Supported File Types */}
-      <div>
-        <h2 className="mb-4 text-lg">Supported File Types</h2>
-        <div className="grid gap-4 md:grid-cols-3">
-          {supportedTypes.map((type) => (
-            <Card
-              key={type.label}
-              className="max-w-74 border border-[#4a4a46]/90 bg-[#1f1e1d]"
-            >
-              <CardHeader className="flex flex-col gap-1">
-                <Icon icon={type.icon} className="h-6 w-6 text-[#e5e5df]" />
-                <div>
-                  <CardTitle className="mb-1 text-base text-[#a2a19f]">
-                    {type.label}
-                  </CardTitle>
-                  <CardDescription className="font-light text-[#91918d]">
-                    {type.description}
-                  </CardDescription>
-                </div>
-              </CardHeader>
-            </Card>
-          ))}
-        </div>
-      </div>
-
-      <section className="space-y-4">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <h2 className="text-lg">Upload Files</h2>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-            <span className="text-sm text-[#91918d]">Sort By</span>
-            <Combobox
-              value={sortBy}
-              onChange={setSortBy}
-              options={sortOptions}
-            />
-          </div>
-        </div>
-
-        <div className="flex min-h-[320px] items-center justify-center rounded-lg p-6 text-center">
-          <div className="flex flex-col items-center gap-3">
-            <Icon icon="bi:inbox" className="h-10 w-10 text-[#91918d]" />
-            <div>
-              <p className="text-base text-white">No files uploaded yet</p>
-              <p className="text-sm text-[#91918d]">
-                Upload a file above to get started
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+      <SupportedFileTypes />
+      <UploadHistorySection sortBy={sortBy} onSortChange={setSortBy} />
 
       {/* TODO: integrate title/description into page content above */}
       {/*
