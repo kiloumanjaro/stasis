@@ -1,19 +1,7 @@
-import Link from 'next/link';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { FeatureFooterCard } from '@/components/FeatureFooterCard';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Icon } from '@iconify/react';
 
 // Bootstrap icon names for Iconify
-const UploadIcon = (props: { className?: string }) => (
-  <Icon icon="bi:upload" className={props.className} />
-);
 const BookOpenIcon = (props: { className?: string }) => (
   <Icon icon="bi:book" className={props.className} />
 );
@@ -45,10 +33,184 @@ const stats = [
   },
 ];
 
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+const HEATMAP_LEVEL_OPACITY = [0.08, 0.24, 0.42, 0.6, 0.82] as const;
+const HEATMAP_CELL_SIZE = '2.125rem';
+const HEATMAP_GAP = '0.75rem';
+
+interface StudyActivityHeatmapProps {
+  activityData: Record<string, number>;
+}
+
+interface CalendarDay {
+  date: Date;
+  key: string;
+  count: number;
+  isCurrentMonth: boolean;
+}
+
+function formatDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+function startOfWeek(date: Date) {
+  const start = new Date(date);
+  start.setDate(date.getDate() - date.getDay());
+  start.setHours(0, 0, 0, 0);
+  return start;
+}
+
+function endOfWeek(date: Date) {
+  const end = new Date(date);
+  end.setDate(date.getDate() + (6 - date.getDay()));
+  end.setHours(0, 0, 0, 0);
+  return end;
+}
+
+function getDisplayMonth(activityData: Record<string, number>) {
+  const keys = Object.keys(activityData).sort();
+
+  if (keys.length === 0) {
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), 1);
+  }
+
+  const latestKey = keys[keys.length - 1];
+  const [year, month] = latestKey.split('-').map(Number);
+  return new Date(year, month - 1, 1);
+}
+
+function getActivityLevel(count: number, maxCount: number) {
+  if (count <= 0 || maxCount <= 0) {
+    return 0;
+  }
+
+  const ratio = count / maxCount;
+
+  if (ratio <= 0.25) {
+    return 1;
+  }
+
+  if (ratio <= 0.5) {
+    return 2;
+  }
+
+  if (ratio <= 0.75) {
+    return 3;
+  }
+
+  return 4;
+}
+
+export function StudyActivityHeatmap({
+  activityData,
+}: StudyActivityHeatmapProps) {
+  const displayMonth = getDisplayMonth(activityData);
+  const monthStart = new Date(
+    displayMonth.getFullYear(),
+    displayMonth.getMonth(),
+    1
+  );
+  const monthEnd = new Date(
+    displayMonth.getFullYear(),
+    displayMonth.getMonth() + 1,
+    0
+  );
+  const gridStart = startOfWeek(monthStart);
+  const gridEnd = endOfWeek(monthEnd);
+  const days: CalendarDay[] = [];
+  const current = new Date(gridStart);
+  const monthlyCounts = Object.entries(activityData)
+    .filter(([key]) => key.startsWith(formatDateKey(monthStart).slice(0, 7)))
+    .map(([, count]) => count);
+  const maxCount = Math.max(0, ...monthlyCounts);
+  const tooltipFormatter = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  while (current <= gridEnd) {
+    const key = formatDateKey(current);
+
+    days.push({
+      date: new Date(current),
+      key,
+      count: activityData[key] ?? 0,
+      isCurrentMonth: current.getMonth() === displayMonth.getMonth(),
+    });
+
+    current.setDate(current.getDate() + 1);
+  }
+
+  const weekCount = days.length / 7;
+
+  return (
+    <div className="w-fit space-y-4 p-4 sm:p-5">
+      <div className="space-y-2">
+        <div
+          className="grid grid-cols-7 justify-items-center text-center text-[10px] uppercase tracking-[0.16em] text-muted-foreground"
+          style={{
+            columnGap: HEATMAP_GAP,
+            width: `calc((7 * ${HEATMAP_CELL_SIZE}) + (6 * ${HEATMAP_GAP}))`,
+          }}
+        >
+          {DAY_LABELS.map((day) => (
+            <span key={day} className="text-center">
+              {day}
+            </span>
+          ))}
+        </div>
+
+        <div
+          className="grid grid-cols-7"
+          style={{
+            gap: HEATMAP_GAP,
+            width: `calc((7 * ${HEATMAP_CELL_SIZE}) + (6 * ${HEATMAP_GAP}))`,
+            gridTemplateRows: `repeat(${weekCount}, minmax(0, 1fr))`,
+          }}
+        >
+          {days.map((day) => {
+            // Assumption: activity levels are normalized against the highest count in the visible month so all 4 active states can be used.
+            const level = getActivityLevel(day.count, maxCount);
+            const opacity = HEATMAP_LEVEL_OPACITY[level];
+
+            return (
+              <div key={day.key} className="flex justify-center">
+                <div
+                  aria-label={`${day.count} cards memorized on ${tooltipFormatter.format(day.date)}`}
+                  className="rounded-[4px] border border-primary/10 transition-transform duration-150 hover:-translate-y-0.5"
+                  style={{
+                    width: HEATMAP_CELL_SIZE,
+                    height: HEATMAP_CELL_SIZE,
+                    backgroundColor: `hsl(var(--primary) / ${opacity})`,
+                    opacity: day.isCurrentMonth ? 1 : 0.45,
+                  }}
+                  title={`${day.count} cards memorized on ${tooltipFormatter.format(day.date)}`}
+                />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function DashboardContent() {
+  const activityData: Record<string, number> = {};
+  const displayMonth = getDisplayMonth(activityData);
+  const monthLabel = new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    year: 'numeric',
+  }).format(displayMonth);
+
   return (
     <div className="space-y-8">
-      {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-3">
         {stats.map((stat) => (
           <Card key={stat.title}>
@@ -68,47 +230,39 @@ export function DashboardContent() {
         ))}
       </div>
 
-      {/* Upload CTA */}
-      <Card className="flex flex-col items-center border border-[#4a4a46] bg-[#30302e]">
-        <CardHeader className="flex flex-col items-center pt-9">
-          <CardTitle>Get Started</CardTitle>
-          <CardDescription>
-            Upload your study materials to generate flashcards with AI
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="pb-9">
-          <Button
-            asChild
-            variant="ghost"
-            className="w-48 items-center rounded-2xl text-[#191919]"
-          >
-            <Link href="/upload">
-              <UploadIcon className="mr-2 h-5 w-5" />
-              Upload Materials
-            </Link>
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Recent Activity */}
-      <FeatureFooterCard
-        title="Recent Activity"
-        description="Your learning history will appear here"
-        leftContent={
-          <p className="ml-3 max-w-md">
-            Track your study sessions and progress here. Your recent flashcard
-            reviews and learning milestones will be displayed.
-          </p>
-        }
-        rightContent={
-          <div className="flex h-full flex-col items-center justify-center px-6 py-12 text-center sm:px-8">
-            <BookOpenIcon className="mb-4 h-12 w-12 text-muted-foreground/50" />
-            <p className="text-sm text-muted-foreground">
-              No activity yet. Start by uploading your first study material!
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">{monthLabel}</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Daily memorization activity
             </p>
-          </div>
-        }
-      />
+          </CardHeader>
+          <CardContent className="pt-0">
+            <StudyActivityHeatmap activityData={activityData} />
+          </CardContent>
+        </Card>
+
+        <Card className="border border-[#4a4a46] bg-[#30302e] transition-colors md:col-span-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-white">
+              Recent Activity
+            </CardTitle>
+            <p className="text-xs text-white/70">
+              Your learning history will appear here
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="flex min-h-[18rem] flex-col items-center justify-center rounded-lg border border-[#4a4a46] bg-[#2a2a28] px-6 py-12 text-center sm:px-8">
+              <BookOpenIcon className="mb-4 h-12 w-12 text-white/45" />
+              <p className="text-sm text-white/70">
+                No activity yet. Your completed study sessions and milestones
+                will show up here.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
