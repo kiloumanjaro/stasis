@@ -188,8 +188,8 @@ export function CVContent() {
   };
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="mb-6">
+    <div className="space-y-6">
+      <div>
         <h1 className="text-2xl">Emotion Recognition</h1>
       </div>
 
@@ -303,7 +303,7 @@ export function CVContent() {
         </Card>
       </div>
 
-      <section className="cv-footer-details mt-6">
+      <section className="cv-footer-details">
         <div className="flex flex-col gap-6 md:flex-row md:justify-between">
           <div className="flex flex-col gap-6 md:w-1/2">
             <div className="flex flex-col justify-between space-y-2 pb-3 text-sm text-muted-foreground">
@@ -333,7 +333,7 @@ export function CVContent() {
       description="The technology used for this product is indicated here"
       className="mt-6"
       */}
-      <Footer className="mt-6" />
+      <Footer />
     </div>
   );
 }

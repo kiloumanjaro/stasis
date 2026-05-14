@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import Image from 'next/image';
 import {
   Card,
   CardContent,
@@ -12,9 +11,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { Footer } from '@/components/dashboard/Footer';
 import { Icon } from '@iconify/react';
-import { Upload, FileText, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { Upload, FileText, CheckCircle2, Loader2 } from 'lucide-react';
 import { createFlashcardDeck } from '@/lib/frontend-store';
 import { fsrsClient } from '@/lib/fsrs-client';
+import { toast } from 'sonner';
 
 const supportedTypes = [
   {
@@ -80,14 +80,10 @@ export function UploadContent() {
   const [rawFile, setRawFile] = useState<File | null>(null);
   const [uploadedFile, setUploadedFile] = useState<UploadedFile | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (selectedFile: File) => {
-    setError(null);
-
     // Validate file type
     const allowedTypes = [
       'application/pdf',
@@ -98,7 +94,10 @@ export function UploadContent() {
     ];
 
     if (!allowedTypes.includes(selectedFile.type)) {
-      setError(
+      setFile(null);
+      setRawFile(null);
+      setUploadedFile(null);
+      toast.error(
         'File type not supported. Please upload a PDF, TXT, PNG, or JPG file.'
       );
       return;
@@ -107,12 +106,17 @@ export function UploadContent() {
     // Validate file size (10MB max)
     const maxSize = 10 * 1024 * 1024;
     if (selectedFile.size > maxSize) {
-      setError('File size exceeds 10MB limit.');
+      setFile(null);
+      setRawFile(null);
+      setUploadedFile(null);
+      toast.error('File size exceeds 10MB limit.');
       return;
     }
 
     setFile(selectedFile);
+    setRawFile(null);
     setUploadedFile(null);
+    void handleUpload(selectedFile);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -142,29 +146,29 @@ export function UploadContent() {
     }
   };
 
-  const handleUpload = async () => {
-    if (!file) return;
+  const handleUpload = async (targetFile?: File) => {
+    const fileToUpload = targetFile ?? file;
+    if (!fileToUpload) return;
 
     setUploading(true);
-    setError(null);
-    setSuccess(null);
 
     try {
-      const publicUrl = URL.createObjectURL(file);
-      const extractedText = file.type === 'text/plain' ? await file.text() : '';
+      const publicUrl = URL.createObjectURL(fileToUpload);
+      const extractedText =
+        fileToUpload.type === 'text/plain' ? await fileToUpload.text() : '';
 
-      setRawFile(file);
+      setRawFile(fileToUpload);
       setUploadedFile({
-        fileName: file.name,
-        fileSize: file.size,
-        fileType: file.type,
-        path: file.name,
+        fileName: fileToUpload.name,
+        fileSize: fileToUpload.size,
+        fileType: fileToUpload.type,
+        path: fileToUpload.name,
         publicUrl,
         extractedText,
       });
       setFile(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to upload file');
+      toast.error(err instanceof Error ? err.message : 'Failed to upload file');
     } finally {
       setUploading(false);
     }
@@ -173,8 +177,6 @@ export function UploadContent() {
   const handleGenerateCards = async () => {
     if (!uploadedFile || !rawFile) return;
 
-    setError(null);
-    setSuccess(null);
     setUploading(true);
 
     try {
@@ -183,12 +185,15 @@ export function UploadContent() {
         formData.append('pdf', rawFile);
         formData.append('cardCount', '10');
         const result = await fsrsClient.decks.create(formData);
-        setSuccess(
+        toast.success(
           `Created deck "${result.deck.name}" with ${result.cards.length} AI-generated cards.`
         );
       } else {
         if (!uploadedFile.extractedText) {
-          throw new Error('No text content available to generate flashcards');
+          toast.error(
+            'This file does not contain readable text to turn into flashcards.'
+          );
+          return;
         }
         const flashcards = buildFlashcardsFromText(
           uploadedFile.extractedText,
@@ -202,12 +207,12 @@ export function UploadContent() {
           description: `Generated from ${uploadedFile.fileName}`,
           flashcards,
         });
-        setSuccess(
+        toast.success(
           `Saved ${flashcards.length} flashcards in deck "${deck.fc_name}".`
         );
       }
     } catch (err) {
-      setError(
+      toast.error(
         err instanceof Error ? err.message : 'Failed to generate flashcards'
       );
     } finally {
@@ -222,6 +227,37 @@ export function UploadContent() {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
   };
+
+  const uploadState = uploading
+    ? 'processing'
+    : uploadedFile
+      ? 'uploaded'
+      : file
+        ? 'selected'
+        : 'idle';
+
+  const handlePrimaryAction = () => {
+    if (uploadState === 'idle') {
+      fileInputRef.current?.click();
+      return;
+    }
+
+    if (uploadState === 'processing') {
+      return;
+    }
+
+    void handleGenerateCards();
+  };
+
+  const primaryButtonLabel = uploading
+    ? uploadedFile
+      ? 'Generating...'
+      : 'Uploading...'
+    : uploadState === 'idle'
+      ? 'Browse Files'
+      : uploadState === 'selected'
+        ? 'Processing...'
+        : 'Generate Cards';
 
   return (
     <div className="space-y-8">
@@ -239,7 +275,7 @@ export function UploadContent() {
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        <CardContent className="flex flex-col items-center justify-center py-12">
+        <CardContent className="flex min-h-[280px] flex-col items-center justify-center py-12">
           <h3 className="mb-1 text-lg font-semibold">
             Drag and drop your files here
           </h3>
@@ -254,74 +290,59 @@ export function UploadContent() {
             onChange={handleFileChange}
           />
           <Button
-            onClick={() => fileInputRef.current?.click()}
+            onClick={handlePrimaryAction}
             variant="ghost"
+            disabled={uploading}
             className="w-40 items-center rounded-2xl text-[#191919]"
           >
-            <Icon icon="bi:upload" className="h-4 w-4 text-[#191919]" />
-            Browse Files
+            {uploading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : uploadState === 'uploaded' ? (
+              <Icon icon="carbon:ai-generate" className="h-4 w-4" />
+            ) : (
+              <Upload
+                className={`h-4 w-4 ${
+                  uploadState === 'idle' ? 'text-[#191919]' : ''
+                }`}
+              />
+            )}
+            {primaryButtonLabel}
           </Button>
 
-          {/* Selected File Display */}
-          {file && (
+          {(file || uploadedFile) && (
             <div className="mt-6 w-full max-w-md">
-              <div className="flex items-center justify-between rounded-lg border bg-card p-4">
-                <div className="flex items-center gap-3">
-                  <FileText className="h-8 w-8 text-primary" />
-                  <div>
-                    <p className="font-medium">{file.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {formatFileSize(file.size)}
-                    </p>
+              <div className="rounded-lg border bg-card px-7 py-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <FileText className="h-7 w-7 text-primary" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">
+                        {uploadedFile?.fileName ?? file?.name}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {formatFileSize(
+                          uploadedFile?.fileSize ?? file?.size ?? 0
+                        )}{' '}
+                        • {uploadedFile?.fileType ?? file?.type}
+                      </p>
+                    </div>
                   </div>
+                  {uploading && !uploadedFile ? (
+                    <Loader2 className="h-5 w-5 shrink-0 animate-spin text-muted-foreground" />
+                  ) : uploadedFile ? (
+                    <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600 dark:text-green-400" />
+                  ) : null}
                 </div>
-                <Button
-                  className="items-center"
-                  onClick={handleUpload}
-                  disabled={uploading}
-                  size="sm"
-                >
-                  {uploading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Uploading...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="mr-2 h-4 w-4" />
-                      Upload
-                    </>
-                  )}
-                </Button>
               </div>
-            </div>
-          )}
-
-          {/* Error Message */}
-          {error && (
-            <div className="mt-4 flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
-              <XCircle className="h-4 w-4" />
-              {error}
-            </div>
-          )}
-
-          {/* Success Message */}
-          {uploadedFile && !error && (
-            <div className="mt-4 flex items-center gap-2 rounded-lg border border-green-500/50 bg-green-500/10 p-3 text-sm text-green-600 dark:text-green-400">
-              <CheckCircle2 className="h-4 w-4" />
-              File uploaded successfully!
-            </div>
-          )}
-
-          {/* Generation Success Message */}
-          {success && (
-            <div className="mt-4 flex items-center gap-2 rounded-lg border border-green-500/50 bg-green-500/10 p-3 text-sm text-green-600 dark:text-green-400">
-              <CheckCircle2 className="h-4 w-4" />
-              {success}
             </div>
           )}
         </CardContent>
       </Card>
+
+      <p className="text-sm text-muted-foreground">
+        AI-generated content may contain errors. Review before use. Only upload
+        content you own and generated content must be for personal use only.
+      </p>
 
       {/* Supported File Types */}
       <div>
@@ -347,86 +368,6 @@ export function UploadContent() {
           ))}
         </div>
       </div>
-
-      <section className="upload-footer-preview space-y-6">
-        <div className="flex flex-col gap-6 md:flex-row md:justify-between">
-          <div className="flex flex-col gap-6 md:w-1/2">
-            <div className="flex flex-col justify-between space-y-2 pb-3 text-sm text-muted-foreground">
-              <p className="ml-3 max-w-md">
-                AI-generated content may contain errors. Review before use. Only
-                upload content you own and generated content must be for
-                personal use only.
-              </p>
-              <Button
-                onClick={handleGenerateCards}
-                disabled={!uploadedFile}
-                variant="ghost"
-                className={`w-40 items-center rounded-xl ${!uploadedFile ? 'text-[#191919]' : 'bg-[#191919] text-white hover:bg-[#252525]'}`}
-              >
-                <Icon icon="carbon:ai-generate" className="mr-0.5 h-4 w-4" />
-                Generate Cards
-              </Button>
-            </div>
-          </div>
-          <div className="flex flex-1 flex-col gap-6">
-            <div className="flex flex-1 flex-col overflow-hidden rounded-lg border border-[#4a4a46]/50 bg-[#191919]">
-              {uploadedFile ? (
-                <div className="flex h-full flex-col space-y-4 p-4">
-                  <div className="flex items-start gap-4 rounded-lg border border-[#4a4a46]/30 bg-[#161616] p-4">
-                    <Icon
-                      icon="bi:file-earmark-text"
-                      className="h-10 w-10 text-primary"
-                    />
-                    <div className="flex-1 overflow-hidden">
-                      <h4 className="truncate font-semibold text-white">
-                        {uploadedFile.fileName}
-                      </h4>
-                      <p className="text-xs text-muted-foreground">
-                        {formatFileSize(uploadedFile.fileSize)} •{' '}
-                        {uploadedFile.fileType}
-                      </p>
-                      <p className="mt-1 truncate text-[10px] text-muted-foreground/50">
-                        Path: {uploadedFile.path}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="min-h-[300px] flex-1 overflow-auto">
-                    {uploadedFile.fileType === 'application/pdf' && (
-                      <iframe
-                        src={uploadedFile.publicUrl}
-                        className="h-full w-full rounded-lg border border-[#4a4a46]/30"
-                        title="PDF Preview"
-                      />
-                    )}
-                    {uploadedFile.fileType.startsWith('image/') && (
-                      <div className="flex justify-center rounded-lg border border-[#4a4a46]/30 bg-[#161616] p-2">
-                        <Image
-                          src={uploadedFile.publicUrl}
-                          alt="Uploaded preview"
-                          className="max-h-80 w-auto rounded-lg object-contain"
-                          width={320}
-                          height={320}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="flex h-full flex-col items-center justify-center py-12 text-center">
-                  <Icon
-                    icon="bi:file-earmark"
-                    className="mb-4 h-12 w-12 text-muted-foreground/50"
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    No file uploaded yet
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
 
       {/* TODO: integrate title/description into page content above */}
       {/*
