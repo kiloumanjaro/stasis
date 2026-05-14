@@ -19,7 +19,6 @@ const footerSections = [
     links: [
       { href: '/cv', label: 'CV Monitor' },
       { href: '/pomodoro', label: 'Pomodoro' },
-      { href: '/roadmap', label: 'Roadmap' },
     ],
   },
   {

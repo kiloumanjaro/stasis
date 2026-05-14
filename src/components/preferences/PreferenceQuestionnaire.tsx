@@ -131,17 +131,7 @@ export function PreferenceQuestionnaire({
   };
 
   const handleSubmit = () => {
-    const params = new URLSearchParams({
-      attention: scores.attention.toString(),
-      adhd: scores.adhd.toString(),
-      stress: scores.stress.toString(),
-      memory: scores.memory.toString(),
-      speed: scores.speed.toString(),
-      grit: scores.grit.toString(),
-      motivation: scores.motivation.toString(),
-    });
-
-    router.push(`/preferences/summary?${params.toString()}`);
+    router.push('/upload');
   };
 
   // Determine theme and intensity based on the CURRENT section being viewed

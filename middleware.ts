@@ -28,7 +28,6 @@ export async function middleware(request: NextRequest) {
     '/dashboard',
     '/upload',
     '/flashcards',
-    '/roadmap',
     '/pomodoro',
     '/profile',
     '/debug-auth',
