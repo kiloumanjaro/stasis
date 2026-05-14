@@ -11,223 +11,107 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Loader2, Layers, Clock, ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import {
-  CardState,
-  Difficulty,
-  getDueCards,
-  areAllCardsMastered,
-} from '@/components/pomodoro/spacedRepetition';
-import {
-  deleteFlashcardDeck as removeFlashcardDeck,
-  getFlashcardDeck,
-  getFlashcardDeckCardStates,
-  listFlashcardDecks,
-  resetFlashcardDeckProgress as resetStoredFlashcardDeckProgress,
-  updateFlashcardState,
-} from '@/lib/frontend-store';
-
-interface Question {
-  qID: number;
-  question: string;
-  answer: string;
-}
-
-interface FlashcardDeck {
-  fc_id: number;
-  fc_name: string;
-  description?: string;
-}
-
-interface DeckStats {
-  fc_id: number;
-  totalCards: number;
-  dueCards: number;
-  nextCardAt: number | null;
-}
+import type { Difficulty } from '@/components/pomodoro/spacedRepetition';
+import { useDecks, type DeckWithStats } from '@/hooks/useDecks';
+import { useSession } from '@/hooks/useSession';
 
 export function FlashcardPracticeArea({
   onRequestEditDeck,
   cardAnimationEnabled = true,
   shortcutsEnabled = true,
 }: {
-  onRequestEditDeck?: (deck: FlashcardDeck) => void;
+  onRequestEditDeck?: (deck: DeckWithStats) => void;
   cardAnimationEnabled?: boolean;
   shortcutsEnabled?: boolean;
 }) {
-  // Loading spinner component
+  const enableCardAnimation = cardAnimationEnabled !== false;
+
+  const {
+    decks,
+    isLoading: isLoadingDecks,
+    error: decksError,
+    fetchDecks,
+    deleteDeck: apiDeleteDeck,
+  } = useDecks();
+
+  const [selectedDeck, setSelectedDeck] = useState<DeckWithStats | null>(null);
+  const [showDeckPreview, setShowDeckPreview] = useState(false);
+  const [isFlipped, setIsFlipped] = useState(false);
+  const [confirmDeleteDeck, setConfirmDeleteDeck] =
+    useState<DeckWithStats | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [sortBy, setSortBy] = useState<'name' | 'due' | 'progress'>('due');
+  const [dueCountAnimation, setDueCountAnimation] = useState<'subtract' | null>(
+    null
+  );
+
+  const {
+    currentCard,
+    totalCards,
+    dueCount,
+    isLoading: isLoadingSession,
+    isSubmitting,
+    error: sessionError,
+    sessionComplete,
+    noCardsDue,
+    loadSession,
+    submitReview,
+    nextDueAt,
+    resetSession,
+  } = useSession(selectedDeck?.id ?? null);
+
+  const error = decksError ?? sessionError;
+  const isLoadingDeck = isLoadingDecks || isLoadingSession;
+
   const LoadingSpinner = () => (
     <div className="flex items-center justify-center gap-3">
       <Loader2 className="h-6 w-6 animate-spin text-white" />
       <span className="text-lg text-white">Loading...</span>
     </div>
   );
-  const enableCardAnimation = cardAnimationEnabled !== false;
-  const [decks, setDecks] = useState<FlashcardDeck[]>([]);
-  const [deckStats, setDeckStats] = useState<Record<number, DeckStats>>({});
-  const [selectedDeck, setSelectedDeck] = useState<FlashcardDeck | null>(null);
-  const [showDeckPreview, setShowDeckPreview] = useState(false);
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [cardStates, setCardStates] = useState<CardState[]>([]);
-  const [currentQID, setCurrentQID] = useState<number | null>(null);
-  const [isFlipped, setIsFlipped] = useState(false);
-  const [allMastered, setAllMastered] = useState(false);
-  const [showMasteredMessage, setShowMasteredMessage] = useState(false);
-  const [isLoadingDeck, setIsLoadingDeck] = useState(true);
-  const [isResetting, setIsResetting] = useState(false);
-  const [now, setNow] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [dueCountAnimation, setDueCountAnimation] = useState<
-    'subtract' | 'add' | null
-  >(null);
-  const [sortBy, setSortBy] = useState<'name' | 'due' | 'progress'>('due');
 
-  // Update current time
-  useEffect(() => {
-    setNow(Date.now());
-    const interval = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Fetch decks on mount
   useEffect(() => {
     fetchDecks();
-  }, []);
+  }, [fetchDecks]);
 
-  const fetchDecks = async () => {
-    try {
-      setIsLoadingDeck(true);
-      setError(null);
-      const fetchedDecks = listFlashcardDecks();
-      setDecks(fetchedDecks);
-
-      // Fetch stats for each deck
-      const stats: Record<number, DeckStats> = {};
-      fetchedDecks.forEach((deck: FlashcardDeck) => {
-        const currentStates = getFlashcardDeckCardStates(deck.fc_id);
-        const dueCards = getDueCards(currentStates, Date.now());
-        const nextCard =
-          currentStates.length > 0
-            ? currentStates.reduce((min, card) =>
-                card.nextReviewAt < min.nextReviewAt ? card : min
-              )
-            : null;
-
-        stats[deck.fc_id] = {
-          fc_id: deck.fc_id,
-          totalCards: currentStates.length,
-          dueCards: dueCards.length,
-          nextCardAt: nextCard ? nextCard.nextReviewAt : null,
-        };
-      });
-      setDeckStats(stats);
-      setIsLoadingDeck(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-      setIsLoadingDeck(false);
-    }
-  };
-
-  const selectDeck = async (deck: FlashcardDeck) => {
-    try {
-      setIsLoadingDeck(true);
-      setError(null);
-      setSelectedDeck(deck);
-
-      const storedDeck = getFlashcardDeck(deck.fc_id);
-      if (!storedDeck) {
-        throw new Error('Failed to fetch questions');
+  // Refresh deck stats when the user returns to the tab after being away
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && !selectedDeck) {
+        fetchDecks();
       }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () =>
+      document.removeEventListener('visibilitychange', handleVisibility);
+  }, [fetchDecks, selectedDeck]);
 
-      const fetchedQuestions = storedDeck.questions.map((q) => ({
-        qID: q.qID,
-        question: q.question,
-        answer: q.answer,
-      }));
-      setQuestions(fetchedQuestions);
-
-      setCardStates(getFlashcardDeckCardStates(deck.fc_id));
-
-      setShowDeckPreview(true);
-      setIsLoadingDeck(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-      setIsLoadingDeck(false);
+  // When no cards are due, auto-reload the session the moment the next card becomes due
+  useEffect(() => {
+    if (!noCardsDue) return;
+    const next = nextDueAt();
+    if (!next) return;
+    const delay = next.getTime() - Date.now();
+    if (delay <= 0) {
+      loadSession();
+      return;
     }
+    const timer = setTimeout(loadSession, delay);
+    return () => clearTimeout(timer);
+  }, [noCardsDue, nextDueAt, loadSession]);
+
+  const selectDeck = (deck: DeckWithStats) => {
+    resetSession();
+    setSelectedDeck(deck);
+    setShowDeckPreview(true);
+    setIsFlipped(false);
   };
 
   const startDeckPractice = () => {
     setShowDeckPreview(false);
-
-    // Set first card
-    const dueCards = getDueCards(cardStates, Date.now());
-    if (dueCards.length > 0) {
-      setCurrentQID(dueCards[0].qID);
-    } else if (cardStates.length > 0) {
-      const soonest = cardStates.reduce((min: CardState, card: CardState) =>
-        card.nextReviewAt < min.nextReviewAt ? card : min
-      );
-      setCurrentQID(soonest.qID);
-    }
+    setIsFlipped(false);
+    loadSession();
   };
-
-  const resetDeckProgress = async () => {
-    if (!selectedDeck) return;
-    try {
-      setIsResetting(true);
-      setError(null);
-      resetStoredFlashcardDeckProgress(selectedDeck.fc_id);
-      setCardStates(getFlashcardDeckCardStates(selectedDeck.fc_id));
-      setIsResetting(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reset deck');
-      setIsResetting(false);
-    }
-  };
-
-  const [confirmDeleteDeck, setConfirmDeleteDeck] =
-    useState<FlashcardDeck | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  const deleteDeck = async (deck: FlashcardDeck) => {
-    // Open confirmation UI instead of window.confirm
-    setConfirmDeleteDeck(deck);
-  };
-
-  const performDeleteDeck = async (deck: FlashcardDeck) => {
-    try {
-      setIsDeleting(true);
-      setError(null);
-      removeFlashcardDeck(deck.fc_id);
-
-      // If the deleted deck is currently selected, clear selection
-      if (selectedDeck?.fc_id === deck.fc_id) {
-        setSelectedDeck(null);
-        setShowDeckPreview(false);
-        setQuestions([]);
-        setCardStates([]);
-      }
-
-      // Refresh deck list/stats
-      await fetchDecks();
-      setConfirmDeleteDeck(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete deck');
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  // Get current card state
-  const currentCardState = cardStates.find((cs) => cs.qID === currentQID);
-  const currentQuestion = questions.find((q) => q.qID === currentQID);
-  const dueCards = getDueCards(cardStates, now);
-
-  // Check if all mastered
-  useEffect(() => {
-    if (cardStates.length === 0) return;
-    const mastered = areAllCardsMastered(cardStates, now);
-    setAllMastered(mastered);
-  }, [cardStates, now]);
 
   const handleFlip = useCallback(() => {
     setIsFlipped((f) => !f);
@@ -235,90 +119,68 @@ export function FlashcardPracticeArea({
 
   const handleDifficulty = useCallback(
     async (difficulty: Difficulty) => {
-      if (!currentCardState) return;
+      if (!currentCard || isSubmitting) return;
 
-      // Show subtract animation
       setDueCountAnimation('subtract');
       await new Promise((resolve) => setTimeout(resolve, 300));
+      setDueCountAnimation(null);
 
-      try {
-        const nextState = updateFlashcardState(
-          currentCardState.qID,
-          difficulty
-        );
-
-        // Update local state
-        const newCardStates = cardStates.map((cs) =>
-          cs.qID === currentCardState.qID ? nextState : cs
-        );
-        setCardStates(newCardStates);
-        setIsFlipped(false);
-
-        // Show add animation if card becomes due again
-        const wasDue = currentCardState.nextReviewAt <= now;
-        const isDueNow = nextState.nextReviewAt <= Date.now();
-        if (isDueNow && wasDue) {
-          setDueCountAnimation('add');
-          await new Promise((resolve) => setTimeout(resolve, 300));
-        }
-        setDueCountAnimation(null);
-
-        // Move to next due card
-        const updatedDueCards = getDueCards(newCardStates, now);
-        if (updatedDueCards.length > 0) {
-          const nextCard =
-            updatedDueCards.find((card) => card.qID !== currentCardState.qID) ||
-            updatedDueCards[0];
-          setCurrentQID(nextCard.qID);
-          setShowMasteredMessage(false);
-        } else {
-          // All current due cards answered
-          setShowMasteredMessage(true);
-          const soonest = newCardStates.reduce(
-            (min: CardState, card: CardState) =>
-              card.nextReviewAt < min.nextReviewAt ? card : min
-          );
-          setCurrentQID(soonest.qID);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to update card');
-      }
+      setIsFlipped(false);
+      await submitReview(difficulty);
     },
-    [cardStates, currentCardState, now]
+    [currentCard, isSubmitting, submitReview]
   );
 
-  useEffect(() => {
-    if (!shortcutsEnabled) {
-      return;
+  const handleOptionalStop = () => {
+    setSelectedDeck(null);
+    setShowDeckPreview(false);
+    setIsFlipped(false);
+    resetSession();
+    fetchDecks();
+  };
+
+  const deleteDeck = (deck: DeckWithStats) => {
+    setConfirmDeleteDeck(deck);
+  };
+
+  const performDeleteDeck = async (deck: DeckWithStats) => {
+    try {
+      setIsDeleting(true);
+      await apiDeleteDeck(deck.id);
+      if (selectedDeck?.id === deck.id) {
+        setSelectedDeck(null);
+        setShowDeckPreview(false);
+        resetSession();
+      }
+      setConfirmDeleteDeck(null);
+    } catch (err) {
+      console.error('Failed to delete deck', err);
+    } finally {
+      setIsDeleting(false);
     }
+  };
+
+  useEffect(() => {
+    if (!shortcutsEnabled) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented) {
-        return;
-      }
+      if (event.defaultPrevented) return;
 
       const target = event.target as HTMLElement | null;
       if (target) {
-        const tagName = target.tagName;
+        const tag = target.tagName;
         if (
-          tagName === 'INPUT' ||
-          tagName === 'TEXTAREA' ||
-          tagName === 'SELECT' ||
-          tagName === 'BUTTON' ||
+          tag === 'INPUT' ||
+          tag === 'TEXTAREA' ||
+          tag === 'SELECT' ||
+          tag === 'BUTTON' ||
           target.isContentEditable
         ) {
           return;
         }
       }
 
-      if (
-        !currentCardState ||
-        !currentQuestion ||
-        showDeckPreview ||
-        allMastered
-      ) {
-        return;
-      }
+      if (!currentCard || showDeckPreview || sessionComplete) return;
 
       if ((event.key === ' ' || event.key === 'Enter') && !isFlipped) {
         event.preventDefault();
@@ -326,9 +188,7 @@ export function FlashcardPracticeArea({
         return;
       }
 
-      if (!isFlipped) {
-        return;
-      }
+      if (!isFlipped) return;
 
       switch (event.key) {
         case '1':
@@ -347,8 +207,6 @@ export function FlashcardPracticeArea({
           event.preventDefault();
           void handleDifficulty('easy');
           break;
-        default:
-          break;
       }
     };
 
@@ -356,33 +214,17 @@ export function FlashcardPracticeArea({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
     shortcutsEnabled,
-    currentCardState,
-    currentQuestion,
+    currentCard,
     showDeckPreview,
-    allMastered,
+    sessionComplete,
     isFlipped,
     handleDifficulty,
     handleFlip,
   ]);
 
-  const handleOptionalStop = () => {
-    setSelectedDeck(null);
-    setQuestions([]);
-    setCardStates([]);
-    setCurrentQID(null);
-    setIsFlipped(false);
-    setAllMastered(false);
-    setShowMasteredMessage(false);
-    fetchDecks();
-  };
-
-  // Show deck preview screen after selection
+  // Deck preview screen
   if (selectedDeck && showDeckPreview) {
-    const dueCardsCount = cardStates.filter(
-      (card) => new Date(card.nextReviewAt).getTime() <= now
-    ).length;
-    const isComplete = areAllCardsMastered(cardStates, now);
-    const canStart = cardStates.length === 0 || !isComplete;
+    const stats = decks.find((d) => d.id === selectedDeck.id) ?? selectedDeck;
 
     return (
       <div className="flex w-full flex-1 items-center justify-center">
@@ -390,7 +232,7 @@ export function FlashcardPracticeArea({
           <div className="mb-8">
             <div className="mb-4 flex items-start justify-between">
               <h2 className="text-2xl font-bold text-white">
-                {selectedDeck.fc_name}
+                {selectedDeck.name}
               </h2>
               <button
                 onClick={handleOptionalStop}
@@ -405,55 +247,39 @@ export function FlashcardPracticeArea({
                 {selectedDeck.description}
               </p>
             )}
-            {cardStates.length > 0 && (
-              <div className="space-y-4">
-                <div className="flex gap-3">
-                  <div className="flex flex-1 items-center gap-3 rounded-lg border border-[#4a4a46] bg-[#191919] p-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#4a4a46]">
-                      <Layers className="h-5 w-5 text-gray-300" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400">Total Cards</p>
-                      <p className="text-xl font-semibold text-white">
-                        {cardStates.length}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex flex-1 items-center gap-3 rounded-lg border border-[#4a4a46] bg-[#191919] p-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#4a4a46]">
-                      <Clock className="h-5 w-5 text-gray-300" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400">Due Now</p>
-                      <p className="text-xl font-semibold text-white">
-                        {dueCardsCount}
-                      </p>
-                    </div>
-                  </div>
+            <div className="flex gap-3">
+              <div className="flex flex-1 items-center gap-3 rounded-lg border border-[#4a4a46] bg-[#191919] p-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#4a4a46]">
+                  <Layers className="h-5 w-5 text-gray-300" />
                 </div>
-                {isComplete && (
-                  <p className="text-green-400">✓ All cards reviewed!</p>
-                )}
+                <div>
+                  <p className="text-xs text-gray-400">Total Cards</p>
+                  <p className="text-xl font-semibold text-white">
+                    {stats.totalCards}
+                  </p>
+                </div>
               </div>
-            )}
+              <div className="flex flex-1 items-center gap-3 rounded-lg border border-[#4a4a46] bg-[#191919] p-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#4a4a46]">
+                  <Clock className="h-5 w-5 text-gray-300" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400">Due Now</p>
+                  <p className="text-xl font-semibold text-white">
+                    {stats.dueCards}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="flex flex-wrap justify-between">
-            <Button
-              onClick={resetDeckProgress}
-              variant="ghost"
-              className="border border-[#4a4a46] bg-none px-4 py-2 text-sm font-normal text-white transition-colors hover:border-[#5a5a56] hover:bg-[#4a4a46] hover:text-white"
-              disabled={isResetting}
-            >
-              {isResetting ? 'Resetting...' : 'Reset Progress'}
-            </Button>
-
+          <div className="flex justify-end">
             <Button
               onClick={startDeckPractice}
-              disabled={!canStart}
+              disabled={stats.dueCards === 0}
               variant="default"
-              className={`px-8 py-2 text-sm ${!canStart ? 'cursor-not-allowed opacity-50' : ''}`}
+              className={`px-8 py-2 text-sm ${stats.dueCards === 0 ? 'cursor-not-allowed opacity-50' : ''}`}
             >
-              Start
+              {stats.dueCards === 0 ? 'No Cards Due' : 'Start'}
             </Button>
           </div>
         </div>
@@ -461,7 +287,7 @@ export function FlashcardPracticeArea({
     );
   }
 
-  // Show deck selection if not selected
+  // Deck list
   if (!selectedDeck) {
     return (
       <div className="flex w-full flex-1 items-center justify-center">
@@ -504,7 +330,6 @@ export function FlashcardPracticeArea({
             </div>
           ) : (
             <div className="px-4 pb-5">
-              {/* Confirmation modal for delete */}
               {confirmDeleteDeck && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
                   <div className="w-full max-w-md rounded-lg bg-[#30302e] p-6 shadow-lg">
@@ -513,7 +338,7 @@ export function FlashcardPracticeArea({
                     </h3>
                     <p className="mb-4 text-sm text-gray-300">
                       Are you sure you want to delete &quot;
-                      {confirmDeleteDeck.fc_name}&quot; and all its cards? This
+                      {confirmDeleteDeck.name}&quot; and all its cards? This
                       action cannot be undone.
                     </p>
                     <div className="flex justify-end gap-2">
@@ -539,105 +364,85 @@ export function FlashcardPracticeArea({
               )}
               <div className="mb-6 flex items-center justify-between">
                 <h2 className="text-xl text-white">Select a Deck</h2>
-                <div className="flex justify-end">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        className="border border-[#4a4a46] bg-[#191919] text-sm text-gray-300 hover:bg-[#4a4a46] hover:text-white"
-                      >
-                        Sort by:{' '}
-                        {sortBy === 'name'
-                          ? 'Name'
-                          : sortBy === 'due'
-                            ? 'Due Cards'
-                            : 'Progress'}
-                        <svg
-                          className="ml-2 h-4 w-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 9l-7 7-7-7"
-                          />
-                        </svg>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      align="end"
-                      className="w-40 border-[#4a4a46] bg-[#30302e]"
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className="border border-[#4a4a46] bg-[#191919] text-sm text-gray-300 hover:bg-[#4a4a46] hover:text-white"
                     >
-                      <DropdownMenuItem
-                        onClick={() => setSortBy('name')}
-                        className="cursor-pointer text-gray-300 focus:bg-[#4a4a46] focus:text-white"
+                      Sort by:{' '}
+                      {sortBy === 'name'
+                        ? 'Name'
+                        : sortBy === 'due'
+                          ? 'Due Cards'
+                          : 'Progress'}
+                      <svg
+                        className="ml-2 h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
                       >
-                        Name
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => setSortBy('due')}
-                        className="cursor-pointer text-gray-300 focus:bg-[#4a4a46] focus:text-white"
-                      >
-                        Due Cards
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => setSortBy('progress')}
-                        className="cursor-pointer text-gray-300 focus:bg-[#4a4a46] focus:text-white"
-                      >
-                        Progress
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    className="w-40 border-[#4a4a46] bg-[#30302e]"
+                  >
+                    <DropdownMenuItem
+                      onClick={() => setSortBy('name')}
+                      className="cursor-pointer text-gray-300 focus:bg-[#4a4a46] focus:text-white"
+                    >
+                      Name
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setSortBy('due')}
+                      className="cursor-pointer text-gray-300 focus:bg-[#4a4a46] focus:text-white"
+                    >
+                      Due Cards
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setSortBy('progress')}
+                      className="cursor-pointer text-gray-300 focus:bg-[#4a4a46] focus:text-white"
+                    >
+                      Progress
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
               <div className="grid max-w-3xl grid-cols-1 gap-3 md:grid-cols-2">
                 {decks
                   .slice()
                   .sort((a, b) => {
-                    const statsA = deckStats[a.fc_id];
-                    const statsB = deckStats[b.fc_id];
-
-                    if (sortBy === 'name') {
-                      return a.fc_name.localeCompare(b.fc_name);
-                    } else if (sortBy === 'due') {
-                      const dueA = statsA?.dueCards || 0;
-                      const dueB = statsB?.dueCards || 0;
-                      return dueB - dueA;
-                    } else if (sortBy === 'progress') {
-                      const progressA = statsA
-                        ? statsA.totalCards > 0
-                          ? ((statsA.totalCards - statsA.dueCards) /
-                              statsA.totalCards) *
-                            100
-                          : 0
+                    if (sortBy === 'name') return a.name.localeCompare(b.name);
+                    if (sortBy === 'due') return b.dueCards - a.dueCards;
+                    const progressA =
+                      a.totalCards > 0
+                        ? ((a.totalCards - a.dueCards) / a.totalCards) * 100
                         : 0;
-                      const progressB = statsB
-                        ? statsB.totalCards > 0
-                          ? ((statsB.totalCards - statsB.dueCards) /
-                              statsB.totalCards) *
-                            100
-                          : 0
+                    const progressB =
+                      b.totalCards > 0
+                        ? ((b.totalCards - b.dueCards) / b.totalCards) * 100
                         : 0;
-                      return progressB - progressA;
-                    }
-                    return 0;
+                    return progressB - progressA;
                   })
                   .map((deck, index) => {
-                    const stats = deckStats[deck.fc_id];
-                    const progress = stats
-                      ? stats.totalCards > 0
-                        ? ((stats.totalCards - stats.dueCards) /
-                            stats.totalCards) *
+                    const progress =
+                      deck.totalCards > 0
+                        ? ((deck.totalCards - deck.dueCards) /
+                            deck.totalCards) *
                           100
-                        : 0
-                      : 0;
+                        : 0;
 
                     return (
                       <Card
-                        key={deck.fc_id}
+                        key={deck.id}
                         onClick={() => selectDeck(deck)}
                         className="group cursor-pointer border border-[#4a4a46] bg-[#3a3a38] p-4 transition-all duration-200 hover:border-[#5a5a56] hover:bg-[#4a4a46] hover:shadow-lg"
                       >
@@ -648,7 +453,7 @@ export function FlashcardPracticeArea({
                                 {index + 1}
                               </span>
                               <h3 className="font-semibold text-white group-hover:underline">
-                                {deck.fc_name}
+                                {deck.name}
                               </h3>
                             </div>
                             {deck.description && (
@@ -657,7 +462,6 @@ export function FlashcardPracticeArea({
                               </p>
                             )}
                           </div>
-                          {/* Triple dot menu for deck actions */}
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <button
@@ -686,11 +490,7 @@ export function FlashcardPracticeArea({
                               <DropdownMenuItem
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  if (onRequestEditDeck) {
-                                    onRequestEditDeck(deck);
-                                  } else {
-                                    alert('Edit deck not available');
-                                  }
+                                  onRequestEditDeck?.(deck);
                                 }}
                                 className="cursor-pointer text-gray-300 focus:bg-[#4a4a46] focus:text-white"
                               >
@@ -713,13 +513,13 @@ export function FlashcardPracticeArea({
                           <div className="flex items-center justify-between text-sm">
                             <span className="text-gray-400">Due</span>
                             <span className="font-semibold text-white">
-                              {stats?.dueCards || 0}
+                              {deck.dueCards}
                             </span>
                           </div>
                           <div className="flex items-center justify-between pb-4 text-sm">
                             <span className="text-gray-400">Total</span>
                             <span className="font-semibold text-white">
-                              {stats?.totalCards || 0}
+                              {deck.totalCards}
                             </span>
                           </div>
                           <div>
@@ -745,7 +545,8 @@ export function FlashcardPracticeArea({
     );
   }
 
-  if (!currentCardState || !currentQuestion) {
+  // Loading session
+  if (isLoadingSession) {
     return (
       <div className="flex w-full flex-1 items-center justify-center">
         <div className="rounded-lg border border-[#4a4a46] bg-[#30302e] p-6">
@@ -755,11 +556,61 @@ export function FlashcardPracticeArea({
     );
   }
 
-  if (allMastered) {
-    const nextCard = cardStates.reduce((min: CardState, card: CardState) =>
-      card.nextReviewAt < min.nextReviewAt ? card : min
+  // No cards currently due (session loaded with 0 cards)
+  if (noCardsDue) {
+    const nextDate = nextDueAt();
+
+    return (
+      <div className="flex w-full flex-1 items-center justify-center">
+        <div className="w-full max-w-md rounded-lg border border-[#4a4a46] bg-[#30302e] p-6">
+          <div className="mb-8">
+            <div className="mb-4 flex items-start justify-between">
+              <h2 className="text-2xl font-bold text-white">No Cards Due</h2>
+              <button
+                onClick={handleOptionalStop}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#4a4a46] text-gray-400 transition-colors hover:border-[#5a5a56] hover:bg-[#4a4a46] hover:text-white"
+                aria-label="Back to decks"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="mb-6 text-base text-gray-300">
+              All cards in this deck have been scheduled for a future review.
+            </p>
+            {nextDate ? (
+              <p className="mb-8 text-gray-400">
+                Next card available at:
+                <br />
+                <span className="text-lg font-semibold text-white">
+                  {nextDate.toLocaleString()}
+                </span>
+              </p>
+            ) : (
+              <p className="mb-8 text-gray-400">
+                Check back later for your next review.
+              </p>
+            )}
+            <p className="text-sm text-gray-400">
+              Deck: <span className="text-gray-300">{selectedDeck?.name}</span>
+            </p>
+          </div>
+          <div className="flex justify-end">
+            <Button
+              onClick={handleOptionalStop}
+              variant="default"
+              className="px-8 py-2 text-sm"
+            >
+              Back to Decks
+            </Button>
+          </div>
+        </div>
+      </div>
     );
-    const nextDueTime = new Date(nextCard.nextReviewAt).toLocaleString();
+  }
+
+  // Session complete (user reviewed all cards in this session)
+  if (sessionComplete) {
+    const nextDate = nextDueAt();
 
     return (
       <div className="flex w-full flex-1 items-center justify-center">
@@ -780,36 +631,39 @@ export function FlashcardPracticeArea({
             <p className="mb-6 text-base text-gray-300">
               No more cards due for review.
             </p>
-            <p className="mb-8 text-gray-400">
-              Next card available at:
-              <br />
-              <span className="text-lg font-semibold text-white">
-                {nextDueTime}
-              </span>
-            </p>
+            {nextDate && (
+              <p className="mb-8 text-gray-400">
+                Next card available at:
+                <br />
+                <span className="text-lg font-semibold text-white">
+                  {nextDate.toLocaleString()}
+                </span>
+              </p>
+            )}
             <p className="text-sm text-gray-400">
-              Deck:{' '}
-              <span className="text-gray-300">{selectedDeck?.fc_name}</span>
+              Deck: <span className="text-gray-300">{selectedDeck?.name}</span>
             </p>
           </div>
-          <div className="flex flex-row justify-between">
+          <div className="flex justify-end">
             <Button
-              onClick={resetDeckProgress}
-              variant="ghost"
-              className="border border-[#4a4a46] px-4 py-2 text-sm text-gray-400 transition-colors hover:border-[#5a5a56] hover:bg-[#4a4a46] hover:text-white"
-              disabled={isResetting}
-            >
-              {isResetting ? 'Resetting...' : 'Reset Progress'}
-            </Button>
-
-            <Button
-              disabled
+              onClick={handleOptionalStop}
               variant="default"
-              className="cursor-not-allowed border border-[#4a4a46] bg-[#191919] px-4 py-2 text-sm text-gray-500 opacity-50"
+              className="px-8 py-2 text-sm"
             >
-              Start
+              Done
             </Button>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Active card review
+  if (!currentCard) {
+    return (
+      <div className="flex w-full flex-1 items-center justify-center">
+        <div className="rounded-lg border border-[#4a4a46] bg-[#30302e] p-6">
+          <LoadingSpinner />
         </div>
       </div>
     );
@@ -823,7 +677,7 @@ export function FlashcardPracticeArea({
           <div className="mb-6 flex items-center justify-between">
             <div>
               <h2 className="mb-1 text-2xl font-bold text-white">Flashcards</h2>
-              <p className="text-gray-400">{selectedDeck?.fc_name}</p>
+              <p className="text-gray-400">{selectedDeck?.name}</p>
             </div>
             <button
               onClick={handleOptionalStop}
@@ -846,42 +700,30 @@ export function FlashcardPracticeArea({
             </button>
           </div>
           <div className="mb-6 flex gap-6 text-sm">
-            <div className="relative">
+            <div>
               <span className="text-gray-400">Due:</span>
               <span
                 className={`ml-2 font-semibold text-white transition-all duration-300 ${
                   dueCountAnimation === 'subtract'
                     ? 'scale-90 text-red-400'
-                    : dueCountAnimation === 'add'
-                      ? 'scale-110 text-green-400'
-                      : ''
+                    : ''
                 }`}
               >
-                {dueCards.length}
+                {dueCount}
               </span>
             </div>
             <div>
               <span className="text-gray-400">Total:</span>
               <span className="ml-2 font-semibold text-white">
-                {cardStates.length}
+                {totalCards}
               </span>
             </div>
           </div>
         </div>
 
-        {/* Error message */}
         {error && (
           <div className="mb-6 rounded-lg border border-red-500/50 bg-red-900/20 p-4 text-center">
             <p className="text-red-300">{error}</p>
-          </div>
-        )}
-
-        {/* Show message when session due cards are done */}
-        {showMasteredMessage && (
-          <div className="mb-6 rounded-lg border border-[#4a4a46] bg-[#191919] p-4 text-center">
-            <p className="text-gray-300">
-              All current due cards reviewed! You can continue or stop here.
-            </p>
           </div>
         )}
 
@@ -902,7 +744,7 @@ export function FlashcardPracticeArea({
                       Question
                     </p>
                     <p className="text-xl font-medium text-white">
-                      {currentQuestion.question}
+                      {currentCard.front}
                     </p>
                   </>
                 ) : (
@@ -911,7 +753,7 @@ export function FlashcardPracticeArea({
                       Answer
                     </p>
                     <p className="text-xl font-medium text-white">
-                      {currentQuestion.answer}
+                      {currentCard.back}
                     </p>
                   </>
                 )}
@@ -925,15 +767,17 @@ export function FlashcardPracticeArea({
               <div className="grid grid-cols-2 gap-2">
                 <Button
                   onClick={() => handleDifficulty('again')}
+                  disabled={isSubmitting}
                   variant="ghost"
-                  className="flex items-center justify-center border border-red-500/50 bg-red-900/20 py-3 text-sm font-semibold text-red-400 hover:bg-red-900/40 hover:text-red-300"
+                  className="flex items-center justify-center border border-red-500/50 bg-red-900/20 py-3 text-sm font-semibold text-red-400 hover:bg-red-900/40 hover:text-red-300 disabled:opacity-50"
                 >
                   Again
                 </Button>
                 <Button
                   onClick={() => handleDifficulty('hard')}
+                  disabled={isSubmitting}
                   variant="ghost"
-                  className="flex items-center justify-center border border-orange-500/50 bg-orange-900/20 py-3 text-sm font-semibold text-orange-400 hover:bg-orange-900/40 hover:text-orange-300"
+                  className="flex items-center justify-center border border-orange-500/50 bg-orange-900/20 py-3 text-sm font-semibold text-orange-400 hover:bg-orange-900/40 hover:text-orange-300 disabled:opacity-50"
                 >
                   Hard
                 </Button>
@@ -941,31 +785,22 @@ export function FlashcardPracticeArea({
               <div className="grid grid-cols-2 gap-2">
                 <Button
                   onClick={() => handleDifficulty('medium')}
+                  disabled={isSubmitting}
                   variant="ghost"
-                  className="flex items-center justify-center border border-blue-500/50 bg-blue-900/20 py-3 text-sm font-semibold text-blue-400 hover:bg-blue-900/40 hover:text-blue-300"
+                  className="flex items-center justify-center border border-blue-500/50 bg-blue-900/20 py-3 text-sm font-semibold text-blue-400 hover:bg-blue-900/40 hover:text-blue-300 disabled:opacity-50"
                 >
                   Medium
                 </Button>
                 <Button
                   onClick={() => handleDifficulty('easy')}
+                  disabled={isSubmitting}
                   variant="ghost"
-                  className="flex items-center justify-center border border-green-500/50 bg-green-900/20 py-3 text-sm font-semibold text-green-400 hover:bg-green-900/40 hover:text-green-300"
+                  className="flex items-center justify-center border border-green-500/50 bg-green-900/20 py-3 text-sm font-semibold text-green-400 hover:bg-green-900/40 hover:text-green-300 disabled:opacity-50"
                 >
                   Easy
                 </Button>
               </div>
             </div>
-          )}
-
-          {/* Optional Stop Button */}
-          {!isFlipped && dueCards.length === 0 && !allMastered && (
-            <Button
-              onClick={handleOptionalStop}
-              variant="ghost"
-              className="mt-6 w-full border border-[#4a4a46] bg-[#191919] py-2 text-sm text-gray-400 hover:bg-[#4a4a46] hover:text-white"
-            >
-              Optional Stop
-            </Button>
           )}
         </div>
       </div>
