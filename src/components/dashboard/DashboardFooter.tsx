@@ -11,7 +11,6 @@ const footerSections = [
     links: [
       { href: '/dashboard', label: 'Dashboard' },
       { href: '/upload', label: 'Upload' },
-      { href: '/flashcards', label: 'Flashcards' },
     ],
   },
   {

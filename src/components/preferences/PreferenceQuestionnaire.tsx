@@ -24,7 +24,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState } from 'react';
 
 const INITIAL_SIMPLE_SCORES = {
   attention: 50,
@@ -36,13 +36,7 @@ const INITIAL_SIMPLE_SCORES = {
   motivation: 50,
 };
 
-interface PreferenceQuestionnaireProps {
-  onColorChange?: (color: string) => void;
-}
-
-export function PreferenceQuestionnaire({
-  onColorChange,
-}: PreferenceQuestionnaireProps) {
+export function PreferenceQuestionnaire() {
   const router = useRouter();
   const [scores, setScores] = useState(INITIAL_SIMPLE_SCORES);
   const [currentSection, setCurrentSection] = useState(0);
@@ -160,38 +154,6 @@ export function PreferenceQuestionnaire({
   };
 
   const currentTheme = getCurrentTheme();
-
-  // Helper function to mix a color with white
-  const mixColorWithWhite = (hexColor: string, whiteMix: number) => {
-    const r = parseInt(hexColor.slice(1, 3), 16);
-    const g = parseInt(hexColor.slice(3, 5), 16);
-    const b = parseInt(hexColor.slice(5, 7), 16);
-
-    const newR = Math.round(r + (255 - r) * whiteMix);
-    const newG = Math.round(g + (255 - g) * whiteMix);
-    const newB = Math.round(b + (255 - b) * whiteMix);
-
-    return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
-  };
-
-  // Memoize the background color calculation
-  const currentScore = scores[section.key as keyof typeof scores];
-  const backgroundColor = useMemo(() => {
-    const baseColor = currentTheme.primary;
-    const intensity = currentScore / 100;
-    return mixColorWithWhite(baseColor, 1 - intensity * 0.85);
-  }, [currentTheme.primary, currentScore]);
-
-  // Track previous color to avoid unnecessary updates
-  const prevColorRef = useRef(backgroundColor);
-
-  // Notify parent of color changes for LightRays
-  useEffect(() => {
-    if (onColorChange && prevColorRef.current !== backgroundColor) {
-      prevColorRef.current = backgroundColor;
-      onColorChange(backgroundColor);
-    }
-  }, [backgroundColor, onColorChange]);
 
   const SectionIcon = section.icon;
 
