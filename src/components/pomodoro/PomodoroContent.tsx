@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { getAppShellViewportInsets } from '@/lib/app-shell';
-import { getFlashcardDeck } from '@/lib/frontend-store';
+import { fsrsClient } from '@/lib/fsrs-client';
+import type { DeckWithStats } from '@/hooks/useDecks';
 import {
   AddFlashcardsWidget,
   CameraWidget,
@@ -55,47 +56,43 @@ export function PomodoroContent({
 
   // Payload for editing an existing deck
   const [editPayload, setEditPayload] = useState<{
-    fcID: number;
+    apiDeckId: number;
     deckTitle: string;
     description?: string;
-    flashcards?: { question: string; answer: string; id?: string }[];
+    flashcards?: {
+      question: string;
+      answer: string;
+      id?: string;
+      backendId?: number;
+    }[];
   } | null>(null);
 
   // Open the AddFlashcardsWidget in edit mode for a given deck
-  const openEditDeck = async (deck: {
-    fc_id: number;
-    fc_name: string;
-    description?: string;
-  }) => {
+  const openEditDeck = async (deck: DeckWithStats) => {
     try {
-      const storedDeck = getFlashcardDeck(deck.fc_id);
-      if (!storedDeck) {
-        throw new Error('Failed to fetch deck questions');
-      }
-
-      const flashcards = storedDeck.questions.map((q) => ({
-        question: q.question,
-        answer: q.answer,
-        id: `${q.qID}`,
+      const cards = await fsrsClient.cards.list(deck.id);
+      const flashcards = cards.map((c) => ({
+        question: c.front,
+        answer: c.back,
+        id: `${c.id}`,
+        backendId: c.id,
       }));
 
       setEditPayload({
-        fcID: deck.fc_id,
-        deckTitle: deck.fc_name,
-        description: deck.description,
+        apiDeckId: deck.id,
+        deckTitle: deck.name,
+        description: deck.description ?? undefined,
         flashcards,
       });
 
-      // Open widget
       setWidgets((prev) => ({ ...prev, addFlashcards: { isOpen: true } }));
       setActiveWidget('addFlashcards');
     } catch (err) {
       console.error('Failed to open edit deck:', err);
-      // fallback: open widget empty
       setEditPayload({
-        fcID: deck.fc_id,
-        deckTitle: deck.fc_name,
-        description: deck.description,
+        apiDeckId: deck.id,
+        deckTitle: deck.name,
+        description: deck.description ?? undefined,
       });
       setWidgets((prev) => ({ ...prev, addFlashcards: { isOpen: true } }));
       setActiveWidget('addFlashcards');
@@ -272,7 +269,7 @@ export function PomodoroContent({
           initialDeck={
             editPayload
               ? {
-                  fcID: editPayload.fcID,
+                  apiDeckId: editPayload.apiDeckId,
                   deckTitle: editPayload.deckTitle,
                   description: editPayload.description,
                 }
