@@ -19,7 +19,7 @@ export default function SignupHeroEffects() {
   useEffect(() => {
     let frameHandle = 0;
     let idleHandle: number | null = null;
-    let timeoutHandle: ReturnType<typeof window.setTimeout> | null = null;
+    let timeoutHandle: number | null = null;
     let cancelled = false;
 
     const revealFallingText = () => {
