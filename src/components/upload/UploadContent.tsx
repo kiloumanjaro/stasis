@@ -14,6 +14,7 @@ import { FeatureFooterCard } from '@/components/FeatureFooterCard';
 import { Icon } from '@iconify/react';
 import { Upload, FileText, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { createFlashcardDeck } from '@/lib/frontend-store';
+import { fsrsClient } from '@/lib/fsrs-client';
 
 const supportedTypes = [
   {
@@ -76,6 +77,7 @@ function buildFlashcardsFromText(text: string, count = 10) {
 
 export function UploadContent() {
   const [file, setFile] = useState<File | null>(null);
+  const [rawFile, setRawFile] = useState<File | null>(null);
   const [uploadedFile, setUploadedFile] = useState<UploadedFile | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -151,6 +153,7 @@ export function UploadContent() {
       const publicUrl = URL.createObjectURL(file);
       const extractedText = file.type === 'text/plain' ? await file.text() : '';
 
+      setRawFile(file);
       setUploadedFile({
         fileName: file.name,
         fileSize: file.size,
@@ -168,39 +171,47 @@ export function UploadContent() {
   };
 
   const handleGenerateCards = async () => {
-    if (!uploadedFile) return;
-
-    // Check if we have extracted text
-    if (!uploadedFile.extractedText) {
-      setError('No text content available to generate flashcards');
-      return;
-    }
+    if (!uploadedFile || !rawFile) return;
 
     setError(null);
     setSuccess(null);
+    setUploading(true);
 
     try {
-      const flashcards = buildFlashcardsFromText(
-        uploadedFile.extractedText,
-        10
-      );
-      if (flashcards.length === 0) {
-        throw new Error('Could not derive any flashcards from this file');
+      if (rawFile.type === 'application/pdf') {
+        const formData = new FormData();
+        formData.append('pdf', rawFile);
+        formData.append('cardCount', '10');
+        const result = await fsrsClient.decks.create(formData);
+        setSuccess(
+          `Created deck "${result.deck.name}" with ${result.cards.length} AI-generated cards.`
+        );
+      } else {
+        if (!uploadedFile.extractedText) {
+          throw new Error('No text content available to generate flashcards');
+        }
+        const flashcards = buildFlashcardsFromText(
+          uploadedFile.extractedText,
+          10
+        );
+        if (flashcards.length === 0) {
+          throw new Error('Could not derive any flashcards from this file');
+        }
+        const deck = createFlashcardDeck({
+          deckTitle: uploadedFile.fileName.replace(/\.[^/.]+$/, ''),
+          description: `Generated from ${uploadedFile.fileName}`,
+          flashcards,
+        });
+        setSuccess(
+          `Saved ${flashcards.length} flashcards in deck "${deck.fc_name}".`
+        );
       }
-
-      const deck = createFlashcardDeck({
-        deckTitle: uploadedFile.fileName.replace(/\.[^/.]+$/, ''),
-        description: `Generated locally from ${uploadedFile.fileName}`,
-        flashcards,
-      });
-
-      setSuccess(
-        `Saved ${flashcards.length} local flashcards in deck "${deck.fc_name}".`
-      );
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Failed to generate flashcards'
       );
+    } finally {
+      setUploading(false);
     }
   };
 

@@ -7,11 +7,13 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { X, Plus, Check } from 'lucide-react';
 import { createFlashcardDeck, updateFlashcardDeck } from '@/lib/frontend-store';
+import { fsrsClient } from '@/lib/fsrs-client';
 
 interface FlashcardEntry {
   question: string;
   answer: string;
   id?: string;
+  backendId?: number;
   source?: 'csv' | 'manual';
 }
 
@@ -20,7 +22,8 @@ interface AddFlashcardsWidgetProps {
   // If provided, widget becomes an editor for an existing deck
   edit?: boolean;
   initialDeck?: {
-    fcID: number;
+    fcID?: number;
+    apiDeckId?: number;
     deckTitle: string;
     description?: string;
   };
@@ -167,7 +170,6 @@ export function AddFlashcardsWidget(props: AddFlashcardsWidgetProps) {
   };
 
   const handleSubmit = async () => {
-    // Mark form as submitted to show field-level validation
     setSubmitted(true);
 
     if (!deckTitle.trim()) {
@@ -190,6 +192,52 @@ export function AddFlashcardsWidget(props: AddFlashcardsWidgetProps) {
     setError('');
 
     try {
+      const apiDeckId = props.initialDeck?.apiDeckId;
+
+      if (props.edit && apiDeckId) {
+        // API deck edit: update/add/delete cards via backend
+        const originalBackendIds = new Set(
+          (props.initialFlashcards ?? [])
+            .map((f) => f.backendId)
+            .filter((id): id is number => id !== undefined)
+        );
+        const currentBackendIds = new Set(
+          validCards
+            .map((c) => c.backendId)
+            .filter((id): id is number => id !== undefined)
+        );
+
+        // Delete removed cards
+        const deletedIds = [...originalBackendIds].filter(
+          (id) => !currentBackendIds.has(id)
+        );
+        await Promise.all(
+          deletedIds.map((cardId) => fsrsClient.cards.delete(apiDeckId, cardId))
+        );
+
+        // Update existing and add new cards sequentially
+        for (const card of validCards) {
+          if (card.backendId) {
+            await fsrsClient.cards.update(
+              apiDeckId,
+              card.backendId,
+              card.question.trim(),
+              card.answer.trim()
+            );
+          } else {
+            await fsrsClient.cards.add(
+              apiDeckId,
+              card.question.trim(),
+              card.answer.trim()
+            );
+          }
+        }
+
+        props.onSaved?.();
+        props.onClose();
+        return;
+      }
+
       if (props.edit && props.initialDeck?.fcID) {
         updateFlashcardDeck({
           fcID: props.initialDeck.fcID,
@@ -197,8 +245,6 @@ export function AddFlashcardsWidget(props: AddFlashcardsWidgetProps) {
           description: description.trim(),
           flashcards: validCards,
         });
-
-        // Notify parent and close
         props.onSaved?.();
         props.onClose();
         return;
@@ -210,7 +256,6 @@ export function AddFlashcardsWidget(props: AddFlashcardsWidgetProps) {
         flashcards: validCards,
       });
 
-      // Success - clear any validation timer and refresh the page to show new deck
       if (submittedTimeoutRef.current) {
         clearTimeout(submittedTimeoutRef.current);
         submittedTimeoutRef.current = null;
@@ -219,7 +264,7 @@ export function AddFlashcardsWidget(props: AddFlashcardsWidgetProps) {
       props.onClose();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : 'Failed to create flashcards'
+        err instanceof Error ? err.message : 'Failed to save flashcards'
       );
     } finally {
       setIsSubmitting(false);
