@@ -158,8 +158,8 @@ export default function OnboardingPreferencesPage() {
           <SliderField
             label="Study block length"
             description="How long each Pomodoro work interval runs"
-            min={15}
-            max={90}
+            min={5}
+            max={120}
             step={5}
             value={form.studyBlockLength}
             valueLabel={`${form.studyBlockLength} min`}
@@ -175,7 +175,7 @@ export default function OnboardingPreferencesPage() {
             label="Mini breaks per session"
             description="Short pauses distributed within one study session"
             min={1}
-            max={3}
+            max={10}
             step={1}
             value={form.miniBreaksPerSession}
             valueLabel={`${form.miniBreaksPerSession} breaks`}
@@ -185,7 +185,7 @@ export default function OnboardingPreferencesPage() {
           <SliderField
             label="Recovery window"
             description="Cooldown after frustration before Stasis re-prompts"
-            min={3}
+            min={5}
             max={30}
             step={1}
             value={form.recoveryDuration}

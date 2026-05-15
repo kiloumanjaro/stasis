@@ -547,8 +547,8 @@ export function SettingsContent() {
             <SliderRow
               title="Study block length"
               description="How long each Pomodoro work interval runs"
-              min={15}
-              max={90}
+              min={5}
+              max={120}
               step={5}
               value={draftPreferences.study_block_length}
               label={`${draftPreferences.study_block_length} min`}
@@ -556,9 +556,9 @@ export function SettingsContent() {
             />
             <SliderRow
               title="Mini breaks per session"
-              description="Short pauses distributed within one study session (1-3)"
+              description="Short pauses distributed within one study session (1-10)"
               min={1}
-              max={3}
+              max={10}
               step={1}
               value={draftPreferences.mini_breaks_per_session}
               label={`${draftPreferences.mini_breaks_per_session} breaks`}
@@ -598,7 +598,7 @@ export function SettingsContent() {
             <SliderRow
               title="Recovery window"
               description="Cooldown after a frustration event before the app re-prompts you"
-              min={3}
+              min={5}
               max={30}
               step={1}
               value={draftPreferences.recovery_duration}

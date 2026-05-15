@@ -80,25 +80,25 @@ export function normalizeRuntimePreferences(value: unknown): UserPreferences {
     emotion_detection:
       typeof record.emotion_detection === 'boolean'
         ? record.emotion_detection
-        : DEFAULT_RUNTIME_PREFERENCES.emotion_detection,
+        : privacyComfort !== 'off',
     expression_tolerance: expressionTolerance,
     study_block_length: clampNumber(
       record.study_block_length,
       DEFAULT_RUNTIME_PREFERENCES.study_block_length,
-      15,
-      90
+      5,
+      120
     ),
     mini_breaks_per_session: clampNumber(
       record.mini_breaks_per_session,
       DEFAULT_RUNTIME_PREFERENCES.mini_breaks_per_session,
       1,
-      3
+      10
     ),
     break_mechanic: breakMechanic,
     recovery_duration: clampNumber(
       record.recovery_duration,
       DEFAULT_RUNTIME_PREFERENCES.recovery_duration,
-      3,
+      5,
       30
     ),
     show_timer:
