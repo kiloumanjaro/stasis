@@ -70,7 +70,8 @@ export default function PermissionsPage() {
         <div className="space-y-2">
           <h1 className="text-2xl font-bold text-[#EAEAF0]">CV Monitoring</h1>
           <p className="text-sm text-[#9090A8]">
-            Let Stasis use your webcam to improve your study sessions.
+            Let Stasis analyze your webcam feed locally to improve your study
+            sessions.
           </p>
         </div>
 
@@ -104,11 +105,12 @@ export default function PermissionsPage() {
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#7C6FF7]" />
             <div>
               <p className="text-[13px] font-medium text-[#EAEAF0]">
-                Fully on-device
+                Video stays local
               </p>
               <p className="text-[13px] text-[#9090A8]">
-                No video ever leaves your device. All processing happens
-                locally.
+                No video ever leaves your device. When monitoring is enabled,
+                Stasis may sync mapped emotion labels to your account during
+                focus sessions.
               </p>
             </div>
           </div>
