@@ -58,9 +58,20 @@ export function PomodoroContent({
   const [activeWidget, setActiveWidget] = useState<WidgetType | null>(
     initialCvMonitoringEnabled ? 'monitor' : null
   );
-  const [shellLeftInset, setShellLeftInset] = useState(0);
-  const [timerInitialX, setTimerInitialX] = useState(0);
-  const [monitorInitialX, setMonitorInitialX] = useState(0);
+  // Lazy initializers ensure correct positions on first client render,
+  // covering the edge case where a widget opens before the resize effect fires.
+  const [shellLeftInset, setShellLeftInset] = useState(() => {
+    if (typeof window === 'undefined') return 0;
+    return getAppShellViewportInsets().left;
+  });
+  const [timerInitialX, setTimerInitialX] = useState(() => {
+    if (typeof window === 'undefined') return 820;
+    return window.innerWidth - WIDGET_WIDTH - 20;
+  });
+  const [monitorInitialX, setMonitorInitialX] = useState(() => {
+    if (typeof window === 'undefined') return 84;
+    return getAppShellViewportInsets().left + 20;
+  });
 
   const [editPayload, setEditPayload] = useState<{
     apiDeckId: number;
@@ -111,11 +122,10 @@ export function PomodoroContent({
     const syncWidgetPositions = () => {
       const { left } = getAppShellViewportInsets();
       setShellLeftInset(left);
-      setMonitorInitialX(left + 20); // left side — below camera
-      setTimerInitialX(window.innerWidth - WIDGET_WIDTH - 20); // right side
+      setMonitorInitialX(left + 20);
+      setTimerInitialX(window.innerWidth - WIDGET_WIDTH - 20);
     };
 
-    syncWidgetPositions();
     window.addEventListener('resize', syncWidgetPositions);
     return () => window.removeEventListener('resize', syncWidgetPositions);
   }, []);

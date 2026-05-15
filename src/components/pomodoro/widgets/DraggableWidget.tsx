@@ -26,8 +26,15 @@ interface DraggableWidgetProps {
   className?: string;
 }
 
-export function DraggableWidget({
-  isOpen,
+type ContentProps = Omit<DraggableWidgetProps, 'isOpen'>;
+
+/**
+ * Inner component — only mounts when the widget is open.
+ * This ensures useDrag captures the correct initialPosition
+ * (which is computed by the parent's useEffect before the user
+ * ever toggles a widget open).
+ */
+function DraggableWidgetContent({
   onMinimize,
   onFocus,
   initialPosition,
@@ -37,7 +44,7 @@ export function DraggableWidget({
   width = 320,
   minHeight = 400,
   className,
-}: DraggableWidgetProps) {
+}: ContentProps) {
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -52,8 +59,6 @@ export function DraggableWidget({
     elementWidth: width,
     elementHeight: minHeight,
   });
-
-  if (!isOpen) return null;
 
   if (isMobile) {
     return (
@@ -94,9 +99,9 @@ export function DraggableWidget({
       style={{
         left: position.x,
         top: position.y,
-        width: width,
-        minHeight: minHeight,
-        zIndex: zIndex,
+        width,
+        minHeight,
+        zIndex,
       }}
       onMouseDown={onFocus}
     >
@@ -125,4 +130,17 @@ export function DraggableWidget({
       <CardContent className="p-3">{children}</CardContent>
     </Card>
   );
+}
+
+/**
+ * Public wrapper — renders nothing when closed so that
+ * DraggableWidgetContent (and its useDrag hook) only mounts
+ * after the parent has computed the correct initialPosition.
+ */
+export function DraggableWidget({
+  isOpen,
+  ...contentProps
+}: DraggableWidgetProps) {
+  if (!isOpen) return null;
+  return <DraggableWidgetContent {...contentProps} />;
 }
