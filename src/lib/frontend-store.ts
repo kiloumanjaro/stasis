@@ -4,6 +4,14 @@ import {
   type Difficulty,
 } from '@/components/pomodoro/spacedRepetition';
 import type { AdaptiveStudyParameters } from '@/types/preferences';
+import {
+  DEFAULT_RUNTIME_PREFERENCES,
+  normalizeRuntimePreferences,
+  type BreakMechanic,
+  type ExpressionTolerance,
+  type PrivacyComfort,
+  type UserPreferences,
+} from '@/types/runtime-preferences';
 
 export type DefaultCardSort = 'due_date' | 'difficulty' | 'random';
 export type GazeSensitivity = 'low' | 'medium' | 'high';
@@ -27,6 +35,14 @@ export interface SettingsProfile {
   completion_sound?: CompletionSound | null;
   reminder_enabled?: boolean | null;
   reminder_time?: string | null;
+  privacy_comfort?: PrivacyComfort | null;
+  emotion_detection?: boolean | null;
+  expression_tolerance?: ExpressionTolerance | null;
+  study_block_length?: number | null;
+  mini_breaks_per_session?: number | null;
+  break_mechanic?: BreakMechanic | null;
+  recovery_duration?: number | null;
+  show_timer?: boolean | null;
 }
 
 export interface OnboardingState {
@@ -34,6 +50,14 @@ export interface OnboardingState {
   breakDurationMinutes: number;
   dailyGoalCards: number;
   cvMonitoringEnabled: boolean;
+  privacyComfort: PrivacyComfort;
+  emotionDetection: boolean;
+  expressionTolerance: ExpressionTolerance;
+  studyBlockLength: number;
+  miniBreaksPerSession: number;
+  breakMechanic: BreakMechanic;
+  recoveryDuration: number;
+  showTimer: boolean;
   completed: boolean;
   skipped: boolean;
 }
@@ -86,6 +110,14 @@ export const DEFAULT_SETTINGS_PROFILE: SettingsProfile = {
   reminder_time: '08:00',
   display_name: null,
   email: null,
+  privacy_comfort: DEFAULT_RUNTIME_PREFERENCES.privacy_comfort,
+  emotion_detection: DEFAULT_RUNTIME_PREFERENCES.emotion_detection,
+  expression_tolerance: DEFAULT_RUNTIME_PREFERENCES.expression_tolerance,
+  study_block_length: DEFAULT_RUNTIME_PREFERENCES.study_block_length,
+  mini_breaks_per_session: DEFAULT_RUNTIME_PREFERENCES.mini_breaks_per_session,
+  break_mechanic: DEFAULT_RUNTIME_PREFERENCES.break_mechanic,
+  recovery_duration: DEFAULT_RUNTIME_PREFERENCES.recovery_duration,
+  show_timer: DEFAULT_RUNTIME_PREFERENCES.show_timer,
 };
 
 export const DEFAULT_ONBOARDING_STATE: OnboardingState = {
@@ -93,6 +125,14 @@ export const DEFAULT_ONBOARDING_STATE: OnboardingState = {
   breakDurationMinutes: 5,
   dailyGoalCards: 20,
   cvMonitoringEnabled: false,
+  privacyComfort: DEFAULT_RUNTIME_PREFERENCES.privacy_comfort,
+  emotionDetection: DEFAULT_RUNTIME_PREFERENCES.emotion_detection,
+  expressionTolerance: DEFAULT_RUNTIME_PREFERENCES.expression_tolerance,
+  studyBlockLength: DEFAULT_RUNTIME_PREFERENCES.study_block_length,
+  miniBreaksPerSession: DEFAULT_RUNTIME_PREFERENCES.mini_breaks_per_session,
+  breakMechanic: DEFAULT_RUNTIME_PREFERENCES.break_mechanic,
+  recoveryDuration: DEFAULT_RUNTIME_PREFERENCES.recovery_duration,
+  showTimer: DEFAULT_RUNTIME_PREFERENCES.show_timer,
   completed: false,
   skipped: false,
 };
@@ -126,6 +166,10 @@ function writeJson<T>(storageKey: string, value: T) {
   }
 
   window.localStorage.setItem(storageKey, JSON.stringify(value));
+}
+
+function readStoredSettingsPatch(): Partial<SettingsProfile> {
+  return readJson<Partial<SettingsProfile>>(SETTINGS_STORAGE_KEY, {});
 }
 
 function normalizeQuestionId(
@@ -172,6 +216,79 @@ export function readOnboardingState(): OnboardingState {
   };
 }
 
+export function runtimePreferencesFromOnboardingState(
+  onboarding = readOnboardingState()
+): UserPreferences {
+  return normalizeRuntimePreferences({
+    privacy_comfort: onboarding.privacyComfort,
+    emotion_detection: onboarding.emotionDetection,
+    expression_tolerance: onboarding.expressionTolerance,
+    study_block_length: onboarding.studyBlockLength,
+    mini_breaks_per_session: onboarding.miniBreaksPerSession,
+    break_mechanic: onboarding.breakMechanic,
+    recovery_duration: onboarding.recoveryDuration,
+    show_timer: onboarding.showTimer,
+  });
+}
+
+export function readRuntimePreferencesFromLocalState(): UserPreferences {
+  const storedSettings = readStoredSettingsPatch();
+  const onboarding = readOnboardingState();
+  const legacyPrivacyComfort =
+    (storedSettings.cv_monitoring_enabled ?? onboarding.cvMonitoringEnabled)
+      ? 'hidden'
+      : 'off';
+
+  return normalizeRuntimePreferences({
+    privacy_comfort: storedSettings.privacy_comfort ?? legacyPrivacyComfort,
+    emotion_detection:
+      storedSettings.emotion_detection ?? onboarding.emotionDetection,
+    expression_tolerance:
+      storedSettings.expression_tolerance ?? onboarding.expressionTolerance,
+    study_block_length:
+      storedSettings.study_block_length ??
+      storedSettings.focus_goal_minutes ??
+      onboarding.studyBlockLength ??
+      onboarding.focusGoalMinutes,
+    mini_breaks_per_session:
+      storedSettings.mini_breaks_per_session ?? onboarding.miniBreaksPerSession,
+    break_mechanic: storedSettings.break_mechanic ?? onboarding.breakMechanic,
+    recovery_duration:
+      storedSettings.recovery_duration ??
+      storedSettings.burnout_threshold_minutes ??
+      onboarding.recoveryDuration,
+    show_timer: storedSettings.show_timer ?? onboarding.showTimer,
+  });
+}
+
+export function getSettingsPatchForRuntimePreferences(
+  preferences: UserPreferences
+): Partial<SettingsProfile> {
+  const normalized = normalizeRuntimePreferences(preferences);
+
+  return {
+    privacy_comfort: normalized.privacy_comfort,
+    emotion_detection: normalized.emotion_detection,
+    expression_tolerance: normalized.expression_tolerance,
+    study_block_length: normalized.study_block_length,
+    mini_breaks_per_session: normalized.mini_breaks_per_session,
+    break_mechanic: normalized.break_mechanic,
+    recovery_duration: normalized.recovery_duration,
+    show_timer: normalized.show_timer,
+    focus_goal_minutes: normalized.study_block_length,
+    cv_monitoring_enabled: normalized.privacy_comfort !== 'off',
+    burnout_threshold_minutes: normalized.recovery_duration,
+  };
+}
+
+export function saveRuntimePreferencesToLocalProfile(
+  preferences: UserPreferences
+) {
+  return saveSettingsProfile(
+    getSettingsPatchForRuntimePreferences(preferences)
+  );
+}
+
 export function saveOnboardingState(patch: Partial<OnboardingState>) {
   const nextState = {
     ...readOnboardingState(),
@@ -186,12 +303,14 @@ export function markOnboardingComplete() {
   const onboarding = saveOnboardingState({
     completed: true,
   });
+  const runtimePreferences = runtimePreferencesFromOnboardingState(onboarding);
 
   saveSettingsProfile({
     focus_goal_minutes: onboarding.focusGoalMinutes,
     break_duration_minutes: onboarding.breakDurationMinutes,
     daily_goal_cards: onboarding.dailyGoalCards,
     cv_monitoring_enabled: onboarding.cvMonitoringEnabled,
+    ...getSettingsPatchForRuntimePreferences(runtimePreferences),
   });
 
   return onboarding;

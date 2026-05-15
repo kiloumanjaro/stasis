@@ -1,65 +1,118 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, Camera, Cpu, ShieldCheck } from 'lucide-react';
+import { Camera, ChevronLeft, EyeOff, ShieldCheck } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { saveOnboardingState } from '@/lib/frontend-store';
+import { cn } from '@/lib/utils';
+import {
+  DEFAULT_RUNTIME_PREFERENCES,
+  normalizeRuntimePreferences,
+  type BreakMechanic,
+  type PrivacyComfort,
+  type UserPreferences,
+} from '@/types/runtime-preferences';
+
+const privacyOptions: Array<{
+  value: PrivacyComfort;
+  label: string;
+  icon: typeof Camera;
+  description: string;
+}> = [
+  {
+    value: 'visible',
+    label: 'Visible',
+    icon: Camera,
+    description: 'Show camera feed while studying.',
+  },
+  {
+    value: 'hidden',
+    label: 'Hidden',
+    icon: EyeOff,
+    description: 'Use camera signals without showing the feed.',
+  },
+  {
+    value: 'off',
+    label: 'Off',
+    icon: ShieldCheck,
+    description: 'Keep camera-based features disabled.',
+  },
+];
+
+const breakOptions: Array<{ value: BreakMechanic; label: string }> = [
+  { value: 'relaxed', label: 'Relaxed' },
+  { value: 'accountable', label: 'Accountable' },
+];
 
 export default function PermissionsPage() {
   const router = useRouter();
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const [granted, setGranted] = useState(false);
+  const previousCameraChoicesRef = useRef({
+    emotion_detection: true,
+    break_mechanic: 'relaxed' as BreakMechanic,
+  });
+  const [preferences, setPreferences] = useState<UserPreferences>(
+    DEFAULT_RUNTIME_PREFERENCES
+  );
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    return () => {
-      streamRef.current?.getTracks().forEach((track) => track.stop());
-    };
-  }, []);
+  const updatePreferences = (patch: Partial<UserPreferences>) => {
+    setPreferences((current) => {
+      const next = { ...current, ...patch };
 
-  useEffect(() => {
-    if (granted && videoRef.current && streamRef.current) {
-      videoRef.current.srcObject = streamRef.current;
-    }
-  }, [granted]);
+      if (
+        patch.privacy_comfort === 'off' &&
+        current.privacy_comfort !== 'off'
+      ) {
+        previousCameraChoicesRef.current = {
+          emotion_detection: current.emotion_detection,
+          break_mechanic: current.break_mechanic,
+        };
+      }
 
-  const handleEnable = async () => {
-    setError(null);
-    let mediaStream: MediaStream;
-    try {
-      mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
-    } catch {
-      setError(
-        'Camera access was denied. You can enable it later in settings.'
-      );
-      return;
-    }
+      if (
+        patch.privacy_comfort &&
+        patch.privacy_comfort !== 'off' &&
+        current.privacy_comfort === 'off'
+      ) {
+        next.emotion_detection =
+          previousCameraChoicesRef.current.emotion_detection;
+        next.break_mechanic = previousCameraChoicesRef.current.break_mechanic;
+      }
 
-    streamRef.current = mediaStream;
-    setSaving(true);
-    try {
-      saveOnboardingState({ cvMonitoringEnabled: true });
-      setGranted(true);
-    } catch {
-      setError('Failed to save. Please try again.');
-      mediaStream.getTracks().forEach((track) => track.stop());
-    } finally {
-      setSaving(false);
-    }
+      const normalized = normalizeRuntimePreferences(next);
+      if (normalized.privacy_comfort !== 'off') {
+        previousCameraChoicesRef.current = {
+          emotion_detection: normalized.emotion_detection,
+          break_mechanic: normalized.break_mechanic,
+        };
+      }
+
+      return normalized;
+    });
   };
 
-  const handleSkip = async () => {
+  const handleContinue = async () => {
+    const normalized = normalizeRuntimePreferences(preferences);
     setSaving(true);
-    saveOnboardingState({ cvMonitoringEnabled: false });
+
+    saveOnboardingState({
+      cvMonitoringEnabled: normalized.privacy_comfort !== 'off',
+      privacyComfort: normalized.privacy_comfort,
+      emotionDetection: normalized.emotion_detection,
+      breakMechanic: normalized.break_mechanic,
+    });
     router.push('/onboarding/complete');
   };
 
+  const cameraOff = preferences.privacy_comfort === 'off';
+
   return (
     <div className="flex min-h-screen items-center justify-center">
-      <div className="w-full max-w-[520px] space-y-8 px-6">
+      <div className="w-full max-w-[560px] space-y-8 px-6">
         <div className="flex items-center gap-4">
           <div className="h-0.5 flex-1 rounded-full bg-[#1E1E26]">
             <div className="h-full w-3/4 rounded-full bg-[#7C6FF7] transition-[width] duration-300" />
@@ -68,68 +121,102 @@ export default function PermissionsPage() {
         </div>
 
         <div className="space-y-2">
-          <h1 className="text-2xl font-bold text-[#EAEAF0]">CV Monitoring</h1>
+          <h1 className="text-2xl font-bold text-[#EAEAF0]">
+            Camera & Privacy
+          </h1>
           <p className="text-sm text-[#9090A8]">
-            Let Stasis use your webcam to improve your study sessions.
+            Choose how camera-based study support should behave.
           </p>
         </div>
 
-        <div className="space-y-4 rounded-xl border border-[#2A2A35] bg-[#131316] p-6">
-          <div className="flex gap-3">
-            <Cpu className="mt-0.5 h-4 w-4 shrink-0 text-[#7C6FF7]" />
-            <div>
-              <p className="text-[13px] font-medium text-[#EAEAF0]">
-                Burnout detection
-              </p>
-              <p className="text-[13px] text-[#9090A8]">
-                Detects signs of fatigue and suggests breaks before you burn
-                out.
-              </p>
-            </div>
+        <Card className="space-y-6 rounded-xl border-[#2A2A35] bg-[#131316] p-6 shadow-none">
+          <div className="grid gap-3 sm:grid-cols-3">
+            {privacyOptions.map(({ value, label, icon: Icon, description }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => updatePreferences({ privacy_comfort: value })}
+                className={cn(
+                  'rounded-lg border border-[#2A2A35] bg-[#1C1C22] p-4 text-left transition-colors hover:border-[#7C6FF7]/70',
+                  preferences.privacy_comfort === value &&
+                    'border-[#7C6FF7] bg-[#211f35]'
+                )}
+              >
+                <Icon className="mb-3 h-5 w-5 text-[#7C6FF7]" />
+                <p className="text-sm font-semibold text-[#EAEAF0]">{label}</p>
+                <p className="mt-1 text-xs leading-snug text-[#9090A8]">
+                  {description}
+                </p>
+              </button>
+            ))}
           </div>
 
-          <div className="flex gap-3">
-            <Camera className="mt-0.5 h-4 w-4 shrink-0 text-[#7C6FF7]" />
+          <label
+            className={cn(
+              'flex items-center justify-between gap-4 rounded-md border border-[#2A2A35] bg-[#1C1C22] p-3',
+              cameraOff && 'opacity-50'
+            )}
+          >
             <div>
-              <p className="text-[13px] font-medium text-[#EAEAF0]">
-                Attention scoring
-              </p>
-              <p className="text-[13px] text-[#9090A8]">
-                Tracks focus levels in real time to help you stay on task.
+              <span className="text-[13px] font-semibold text-[#EAEAF0]">
+                Emotion detection
+              </span>
+              <p className="mt-1 text-xs text-[#9090A8]">
+                Detect frustration and fatigue during focus sessions.
               </p>
             </div>
-          </div>
+            <Checkbox
+              role="switch"
+              checked={preferences.emotion_detection}
+              disabled={cameraOff}
+              onCheckedChange={(checked) =>
+                updatePreferences({ emotion_detection: checked === true })
+              }
+              className="h-5 w-10 rounded-full border-0 bg-[#5b5c57] data-[state=checked]:bg-[#2dbd91]"
+            />
+          </label>
 
-          <div className="flex gap-3">
-            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#7C6FF7]" />
+          <div className="space-y-3">
             <div>
-              <p className="text-[13px] font-medium text-[#EAEAF0]">
-                Fully on-device
+              <p className="text-[13px] font-semibold text-[#EAEAF0]">
+                Break mechanic
               </p>
-              <p className="text-[13px] text-[#9090A8]">
-                No video ever leaves your device. All processing happens
-                locally.
+              <p className="mt-1 text-xs text-[#9090A8]">
+                Accountable breaks require an active camera.
               </p>
             </div>
+            <div className="inline-flex w-full overflow-hidden rounded-md border border-[#3A3A45] bg-[#1C1C22]">
+              {breakOptions.map((option) => {
+                const disabled = cameraOff && option.value === 'accountable';
+                return (
+                  <Button
+                    key={option.value}
+                    type="button"
+                    variant="outline"
+                    disabled={disabled}
+                    title={disabled ? 'Requires camera' : undefined}
+                    onClick={() =>
+                      updatePreferences({ break_mechanic: option.value })
+                    }
+                    className={cn(
+                      'h-10 flex-1 rounded-none border-0 border-l border-[#3A3A45] bg-transparent text-[#9090A8] shadow-none first:border-l-0 hover:bg-[#24242c] hover:text-[#EAEAF0]',
+                      preferences.break_mechanic === option.value &&
+                        'bg-[#292933] text-[#EAEAF0]',
+                      disabled && 'opacity-40'
+                    )}
+                  >
+                    {option.label}
+                  </Button>
+                );
+              })}
+            </div>
+            {cameraOff && (
+              <p className="text-xs font-medium text-[#5A5A72]">
+                Accountable mode requires camera.
+              </p>
+            )}
           </div>
-
-          {granted && (
-            <div className="mt-2 overflow-hidden rounded-lg border border-[#2A2A35]">
-              <video
-                ref={videoRef}
-                autoPlay
-                muted
-                playsInline
-                className="h-48 w-full object-cover"
-              />
-              <p className="bg-[#1C1C22] py-2 text-center text-xs text-[#9090A8]">
-                Camera active — monitoring enabled
-              </p>
-            </div>
-          )}
-        </div>
-
-        {error && <p className="text-center text-sm text-[#F04F4F]">{error}</p>}
+        </Card>
 
         <div className="flex items-center justify-between">
           <Button
@@ -141,32 +228,9 @@ export default function PermissionsPage() {
           >
             <ChevronLeft className="h-5 w-5" />
           </Button>
-          <div className="flex items-center gap-3">
-            {!granted && (
-              <button
-                onClick={handleSkip}
-                disabled={saving}
-                className="text-sm text-[#5A5A72] transition-colors hover:text-[#9090A8] disabled:opacity-50"
-              >
-                Skip for now
-              </button>
-            )}
-            <Button
-              onClick={
-                granted
-                  ? () => router.push('/onboarding/complete')
-                  : handleEnable
-              }
-              disabled={saving}
-              className="px-8"
-            >
-              {saving
-                ? 'Saving...'
-                : granted
-                  ? 'Continue'
-                  : 'Enable Monitoring'}
-            </Button>
-          </div>
+          <Button onClick={handleContinue} disabled={saving} className="px-8">
+            {saving ? 'Saving...' : 'Continue'}
+          </Button>
         </div>
       </div>
     </div>

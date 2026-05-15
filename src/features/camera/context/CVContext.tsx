@@ -11,6 +11,7 @@ import {
 import { useFaceApiCV } from '../hooks/useFaceApiCV';
 import { useCameraContextSafe } from './CameraContext';
 import type { CVResponse, EmotionSnapshot } from '../types';
+import type { ExpressionTolerance } from '@/types/runtime-preferences';
 
 /**
  * Configuration for history tracking
@@ -48,6 +49,8 @@ const CVContext = createContext<CVContextType | null>(null);
  */
 interface CVProviderProps {
   children: ReactNode;
+  enabled?: boolean;
+  expressionTolerance?: ExpressionTolerance;
 }
 
 /**
@@ -60,22 +63,29 @@ interface CVProviderProps {
  * - Maintains a history of emotion snapshots for trend analysis
  * - Processes everything client-side (no video transmission)
  */
-export function CVProvider({ children }: CVProviderProps) {
+export function CVProvider({
+  children,
+  enabled = true,
+  expressionTolerance = 'neutral',
+}: CVProviderProps) {
   // Consume camera context to access video element
   const cameraContext = useCameraContextSafe();
   const videoRef = cameraContext?.videoRef;
   const isCameraActive = cameraContext?.isCameraActive ?? false;
 
   // Use face-api.js hook for face detection
-  const { connectionStatus, latestCVData, error, isModelLoaded } =
-    useFaceApiCV(videoRef);
+  const { connectionStatus, latestCVData, error, isModelLoaded } = useFaceApiCV(
+    videoRef,
+    { enabled, expressionTolerance }
+  );
 
   // Refs for history tracking
   const historyRef = useRef<EmotionSnapshot[]>([]);
 
   // Derived state
-  const isConnected = connectionStatus === 'connected' && isModelLoaded;
-  const isCapturing = isConnected && isCameraActive;
+  const isConnected =
+    enabled && connectionStatus === 'connected' && isModelLoaded;
+  const isCapturing = enabled && isConnected && isCameraActive;
 
   /**
    * Add a snapshot to the history

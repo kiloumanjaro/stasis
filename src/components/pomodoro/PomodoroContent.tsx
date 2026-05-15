@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getAppShellViewportInsets } from '@/lib/app-shell';
 import { fsrsClient } from '@/lib/fsrs-client';
 import type { DeckWithStats } from '@/hooks/useDecks';
@@ -39,6 +39,9 @@ interface PomodoroContentProps {
     longBreakDuration?: number;
   };
   initialCvMonitoringEnabled?: boolean;
+  initialCameraVisible?: boolean;
+  initialEmotionDetectionEnabled?: boolean;
+  showTimer?: boolean;
   cardAnimationEnabled?: boolean;
   shortcutsEnabled?: boolean;
 }
@@ -46,17 +49,26 @@ interface PomodoroContentProps {
 export function PomodoroContent({
   initialTimerSettings,
   initialCvMonitoringEnabled = false,
+  initialCameraVisible = initialCvMonitoringEnabled,
+  initialEmotionDetectionEnabled = true,
+  showTimer = true,
   cardAnimationEnabled = true,
   shortcutsEnabled = true,
 }: PomodoroContentProps) {
   const [widgets, setWidgets] = useState<WidgetState>({
-    camera: { isOpen: initialCvMonitoringEnabled },
+    camera: { isOpen: initialCameraVisible },
     timer: { isOpen: false },
-    monitor: { isOpen: initialCvMonitoringEnabled },
+    monitor: {
+      isOpen: initialCvMonitoringEnabled && initialEmotionDetectionEnabled,
+    },
     addFlashcards: { isOpen: false },
   });
   const [activeWidget, setActiveWidget] = useState<WidgetType | null>(
-    initialCvMonitoringEnabled ? 'monitor' : null
+    initialCameraVisible
+      ? 'camera'
+      : initialCvMonitoringEnabled && initialEmotionDetectionEnabled
+        ? 'monitor'
+        : null
   );
   // Lazy initializers ensure correct positions on first client render,
   // covering the edge case where a widget opens before the resize effect fires.
@@ -131,14 +143,24 @@ export function PomodoroContent({
   }, []);
 
   const camera = useCameraContextSafe();
+  const hiddenCameraVideoRef = useRef<HTMLVideoElement>(null);
   const isCameraActive = camera?.isCameraActive ?? false;
+
   useEffect(() => {
-    if (!isCameraActive) return;
+    if (!initialCvMonitoringEnabled || initialCameraVisible) {
+      return;
+    }
+
+    camera?.registerVideoRef(hiddenCameraVideoRef);
+  }, [camera, initialCameraVisible, initialCvMonitoringEnabled]);
+
+  useEffect(() => {
+    if (!isCameraActive || !initialCameraVisible) return;
     setWidgets((prev) =>
       prev.camera.isOpen ? prev : { ...prev, camera: { isOpen: true } }
     );
     setActiveWidget('camera');
-  }, [isCameraActive]);
+  }, [initialCameraVisible, isCameraActive]);
 
   const toggleWidget = useCallback((widget: WidgetType) => {
     setWidgets((prev) => ({
@@ -187,6 +209,16 @@ export function PomodoroContent({
           shortcutsEnabled={shortcutsEnabled}
         />
       </div>
+
+      {initialCvMonitoringEnabled && !initialCameraVisible && (
+        <video
+          ref={hiddenCameraVideoRef}
+          className="hidden"
+          autoPlay
+          muted
+          playsInline
+        />
+      )}
 
       {/* Add Flashcards FAB */}
       <button
@@ -253,7 +285,11 @@ export function PomodoroContent({
         width={WIDGET_WIDTH}
         minHeight={460}
       >
-        <TimerWidget initialSettings={initialTimerSettings} />
+        <TimerWidget
+          initialSettings={initialTimerSettings}
+          cameraEnabled={initialCvMonitoringEnabled}
+          showTimer={showTimer}
+        />
       </DraggableWidget>
 
       {/* Add Flashcards — center */}

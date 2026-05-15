@@ -1,719 +1,645 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { Check } from 'lucide-react';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { getBackendUser } from '@/lib/backend-auth';
 import {
-  clearFrontendAppState,
-  DEFAULT_SETTINGS_PROFILE,
-  readOnboardingState,
-  readPreferenceSummary,
-  readSettingsProfile,
-  saveSettingsProfile,
-  type CompletionSound,
-  type DefaultCardSort,
-  type GazeSensitivity,
-  type SettingsProfile,
+  getRuntimePreferences,
+  saveRuntimePreferences,
+} from '@/lib/preferences-client';
+import {
+  readRuntimePreferencesFromLocalState,
+  runtimePreferencesFromOnboardingState,
+  saveRuntimePreferencesToLocalProfile,
 } from '@/lib/frontend-store';
+import { cn } from '@/lib/utils';
+import {
+  DEFAULT_RUNTIME_PREFERENCES,
+  normalizeRuntimePreferences,
+  runtimePreferencesEqual,
+  type BreakMechanic,
+  type ExpressionTolerance,
+  type OnboardingSnapshot,
+  type PrivacyComfort,
+  type UserPreferences,
+} from '@/types/runtime-preferences';
 
 type StatusType = 'idle' | 'success' | 'error';
 
-const sortOptions: Array<{ value: DefaultCardSort; label: string }> = [
-  { value: 'due_date', label: 'Due Date' },
-  { value: 'difficulty', label: 'Difficulty' },
-  { value: 'random', label: 'Random' },
-];
+type SegmentOption<T extends string> = {
+  value: T;
+  label: string;
+  disabled?: boolean;
+  title?: string;
+};
 
-const gazeOptions: Array<{ value: GazeSensitivity; label: string }> = [
-  { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'high', label: 'High' },
-];
-
-const completionSoundOptions: Array<{ value: CompletionSound; label: string }> =
-  [
-    { value: 'none', label: 'None' },
-    { value: 'soft_chime', label: 'Soft chime' },
-    { value: 'bell', label: 'Bell' },
-  ];
-
-function toBool(value: unknown, fallback: boolean) {
-  return typeof value === 'boolean' ? value : fallback;
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-2">
+      <h2 className="px-0.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#aaa7a0]">
+        {title}
+      </h2>
+      <Card className="overflow-hidden rounded-lg border-[#55534e] bg-[#2f302e] text-[#f3f1eb] shadow-none">
+        {children}
+      </Card>
+    </section>
+  );
 }
 
-function toNum(value: unknown, fallback: number) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
+function SettingRow({
+  title,
+  description,
+  children,
+  className,
+}: {
+  title: string;
+  description: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        'flex flex-col gap-4 border-t border-[#4d4c48] px-4 py-4 first:border-t-0 sm:flex-row sm:items-center sm:justify-between',
+        className
+      )}
+    >
+      <div className="min-w-0">
+        <p className="text-sm font-semibold leading-tight text-[#f5f3ed]">
+          {title}
+        </p>
+        <p className="mt-1 max-w-[360px] text-xs font-medium leading-snug text-[#c6c3bb]">
+          {description}
+        </p>
+      </div>
+      <div className="shrink-0">{children}</div>
+    </div>
+  );
 }
 
-function createInitialSettingsState(): SettingsProfile {
-  return {
-    focus_goal_minutes: toNum(DEFAULT_SETTINGS_PROFILE.focus_goal_minutes, 25),
-    break_duration_minutes: toNum(
-      DEFAULT_SETTINGS_PROFILE.break_duration_minutes,
-      5
-    ),
-    long_break_duration_minutes: toNum(
-      DEFAULT_SETTINGS_PROFILE.long_break_duration_minutes,
-      20
-    ),
-    daily_goal_cards: toNum(DEFAULT_SETTINGS_PROFILE.daily_goal_cards, 20),
-    default_card_sort: (DEFAULT_SETTINGS_PROFILE.default_card_sort ??
-      'due_date') as DefaultCardSort,
-    shortcuts_enabled: toBool(DEFAULT_SETTINGS_PROFILE.shortcuts_enabled, true),
-    cv_monitoring_enabled: toBool(
-      DEFAULT_SETTINGS_PROFILE.cv_monitoring_enabled,
-      false
-    ),
-    burnout_threshold_minutes: toNum(
-      DEFAULT_SETTINGS_PROFILE.burnout_threshold_minutes,
-      10
-    ),
-    gaze_sensitivity: (DEFAULT_SETTINGS_PROFILE.gaze_sensitivity ??
-      'medium') as GazeSensitivity,
-    display_name: (DEFAULT_SETTINGS_PROFILE.display_name ?? '').slice(0, 40),
-    heatmap_range_days: (DEFAULT_SETTINGS_PROFILE.heatmap_range_days ?? 30) as
-      | 30
-      | 60
-      | 90,
-    card_animation_enabled: toBool(
-      DEFAULT_SETTINGS_PROFILE.card_animation_enabled,
-      true
-    ),
-    completion_sound: (DEFAULT_SETTINGS_PROFILE.completion_sound ??
-      'soft_chime') as CompletionSound,
-    reminder_enabled: toBool(DEFAULT_SETTINGS_PROFILE.reminder_enabled, false),
-    reminder_time: DEFAULT_SETTINGS_PROFILE.reminder_time ?? '08:00',
-    email: DEFAULT_SETTINGS_PROFILE.email ?? null,
-  };
+function SegmentedControl<T extends string>({
+  value,
+  options,
+  onChange,
+  ariaLabel,
+}: {
+  value: T;
+  options: Array<SegmentOption<T>>;
+  onChange: (value: T) => void;
+  ariaLabel: string;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label={ariaLabel}
+      className="inline-flex overflow-hidden rounded-md border border-[#6a6964] bg-[#383936]"
+    >
+      {options.map((option) => {
+        const isActive = value === option.value;
+        return (
+          <Button
+            key={option.value}
+            type="button"
+            variant="outline"
+            disabled={option.disabled}
+            title={option.title}
+            aria-pressed={isActive}
+            onClick={() => onChange(option.value)}
+            className={cn(
+              'h-9 min-w-24 rounded-none border-0 border-l border-[#6a6964] bg-transparent px-4 text-sm font-semibold text-[#f5f3ed] shadow-none first:border-l-0 hover:bg-[#464743]',
+              isActive &&
+                'bg-[#434440] text-white shadow-[inset_0_0_0_1px_#7b7973]',
+              option.disabled &&
+                'cursor-not-allowed opacity-40 hover:bg-transparent'
+            )}
+          >
+            {option.label}
+          </Button>
+        );
+      })}
+    </div>
+  );
+}
+
+function ToggleControl({
+  id,
+  checked,
+  disabled,
+  onCheckedChange,
+}: {
+  id: string;
+  checked: boolean;
+  disabled?: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}) {
+  return (
+    <Checkbox
+      id={id}
+      role="switch"
+      checked={checked}
+      disabled={disabled}
+      onCheckedChange={(value) => onCheckedChange(value === true)}
+      className={cn(
+        'h-5 w-10 rounded-full border-0 bg-[#5b5c57] p-0 shadow-none transition-colors data-[state=checked]:bg-[#2dbd91] [&>span]:block [&>span]:h-4 [&>span]:w-4 [&>span]:translate-x-0.5 [&>span]:rounded-full [&>span]:bg-white [&>span]:text-transparent [&>span]:transition-transform data-[state=checked]:[&>span]:translate-x-[22px]',
+        disabled && 'cursor-not-allowed opacity-45'
+      )}
+    />
+  );
+}
+
+function SliderRow({
+  title,
+  description,
+  value,
+  min,
+  max,
+  step,
+  label,
+  onChange,
+}: {
+  title: string;
+  description: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  label: string;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div className="border-t border-[#4d4c48] px-4 py-4 first:border-t-0">
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold leading-tight text-[#f5f3ed]">
+            {title}
+          </p>
+          <p className="mt-1 max-w-[420px] text-xs font-medium leading-snug text-[#c6c3bb]">
+            {description}
+          </p>
+        </div>
+        <span className="rounded-full bg-[#d8fff1] px-3 py-0.5 text-xs font-bold text-[#1b6653]">
+          {label}
+        </span>
+      </div>
+      <Slider
+        min={min}
+        max={max}
+        step={step}
+        value={[value]}
+        onValueChange={(nextValue) => onChange(nextValue[0] ?? value)}
+        className="[&_[data-slot=slider-range]]:bg-[#7c7b75] [&_[data-slot=slider-thumb]]:border-[#74736d] [&_[data-slot=slider-track]]:h-1 [&_[data-slot=slider-track]]:bg-[#565550]"
+      />
+    </div>
+  );
 }
 
 export function SettingsContent() {
-  const [settings, setSettings] = useState<SettingsProfile>(
-    createInitialSettingsState()
+  const [savedPreferences, setSavedPreferences] = useState<UserPreferences>(
+    DEFAULT_RUNTIME_PREFERENCES
   );
+  const [draftPreferences, setDraftPreferences] = useState<UserPreferences>(
+    DEFAULT_RUNTIME_PREFERENCES
+  );
+  const [onboardingSnapshot, setOnboardingSnapshot] =
+    useState<OnboardingSnapshot | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [forceDirty, setForceDirty] = useState(false);
   const [status, setStatus] = useState<{ type: StatusType; message: string }>({
     type: 'idle',
     message: '',
   });
-  const [password, setPassword] = useState('');
-  const [cameraStatus, setCameraStatus] = useState<
-    'idle' | 'requesting' | 'active' | 'blocked'
-  >('idle');
   const [isSaving, startSaving] = useTransition();
-  const [isChangingPassword, startChangingPassword] = useTransition();
-  const [isExporting, startExporting] = useTransition();
-  const [isDeletingAccount, startDeletingAccount] = useTransition();
+  const previousCameraChoicesRef = useRef({
+    emotion_detection: true,
+    break_mechanic: 'relaxed' as BreakMechanic,
+  });
 
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-
-  useEffect(() => {
-    return () => {
-      streamRef.current?.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    };
-  }, []);
+  const isDirty = useMemo(
+    () =>
+      forceDirty ||
+      !runtimePreferencesEqual(savedPreferences, draftPreferences),
+    [draftPreferences, forceDirty, savedPreferences]
+  );
 
   useEffect(() => {
     let isMounted = true;
-    const storedSettings = readSettingsProfile();
 
-    setSettings((prev) => ({
-      ...prev,
-      ...storedSettings,
-      display_name: (storedSettings.display_name ?? '').slice(0, 40),
-    }));
+    const loadPreferences = async () => {
+      const localPreferences = readRuntimePreferencesFromLocalState();
 
-    void getBackendUser().then((user) => {
-      if (!isMounted || !user) {
-        return;
+      try {
+        const response = await getRuntimePreferences();
+        const hasRemotePreferences =
+          response.storage_available && response.updated_at !== null;
+        const loadedPreferences = normalizeRuntimePreferences(
+          hasRemotePreferences ? response.preferences : localPreferences
+        );
+        const snapshot = hasRemotePreferences
+          ? (response.onboarding_snapshot ??
+            runtimePreferencesFromOnboardingState())
+          : runtimePreferencesFromOnboardingState();
+
+        if (!isMounted) {
+          return;
+        }
+
+        setSavedPreferences(loadedPreferences);
+        setDraftPreferences(loadedPreferences);
+        setOnboardingSnapshot(snapshot);
+
+        if (hasRemotePreferences) {
+          saveRuntimePreferencesToLocalProfile(loadedPreferences);
+        } else if (!response.storage_available) {
+          setStatus({
+            type: 'error',
+            message: 'Using local settings until preferences reconnect.',
+          });
+        }
+
+        if (loadedPreferences.privacy_comfort !== 'off') {
+          previousCameraChoicesRef.current = {
+            emotion_detection: loadedPreferences.emotion_detection,
+            break_mechanic: loadedPreferences.break_mechanic,
+          };
+        }
+      } catch {
+        console.warn(
+          'Using local runtime preferences until backend preferences are available.'
+        );
+        const fallbackPreferences =
+          normalizeRuntimePreferences(localPreferences);
+
+        if (!isMounted) {
+          return;
+        }
+
+        setSavedPreferences(fallbackPreferences);
+        setDraftPreferences(fallbackPreferences);
+        setOnboardingSnapshot(runtimePreferencesFromOnboardingState());
+        setStatus({
+          type: 'error',
+          message: 'Using local settings until preferences reconnect.',
+        });
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+          setForceDirty(false);
+        }
       }
+    };
 
-      setSettings((prev) => ({
-        ...prev,
-        id: user.id,
-        email: user.email,
-        display_name:
-          prev.display_name && prev.display_name.trim().length > 0
-            ? prev.display_name
-            : user.name,
-      }));
-    });
+    void loadPreferences();
 
     return () => {
       isMounted = false;
     };
   }, []);
 
-  const showCameraPreview = settings.cv_monitoring_enabled;
-
   useEffect(() => {
-    const ensurePreview = async () => {
-      if (!showCameraPreview) {
-        streamRef.current?.getTracks().forEach((track) => track.stop());
-        streamRef.current = null;
-        if (videoRef.current) {
-          videoRef.current.srcObject = null;
-        }
-        setCameraStatus('idle');
-        return;
-      }
-
-      if (streamRef.current) {
-        setCameraStatus('active');
-        return;
-      }
-
-      try {
-        setCameraStatus('requesting');
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: false,
-        });
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-        setCameraStatus('active');
-      } catch (error) {
-        console.error('Unable to start webcam preview:', error);
-        setCameraStatus('blocked');
-      }
-    };
-
-    void ensurePreview();
-  }, [showCameraPreview]);
-
-  const statusTone = useMemo(() => {
-    if (status.type === 'error') return 'destructive' as const;
-    return 'default' as const;
-  }, [status.type]);
-
-  const setField = <K extends keyof SettingsProfile>(
-    key: K,
-    value: SettingsProfile[K]
-  ) => {
-    setSettings((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const saveAllSettings = () => {
-    setStatus({ type: 'idle', message: '' });
-
-    startSaving(async () => {
-      const nextSettings = saveSettingsProfile(settings);
-      setSettings(nextSettings);
-      setStatus({
-        type: 'success',
-        message: 'Settings updated locally on this device.',
-      });
-    });
-  };
-
-  const saveDisplayName = () => {
-    startSaving(async () => {
-      const nextSettings = saveSettingsProfile({
-        display_name: settings.display_name ?? '',
-      });
-      setSettings((prev) => ({ ...prev, ...nextSettings }));
-      setStatus({
-        type: 'success',
-        message: 'Display name updated locally.',
-      });
-    });
-  };
-
-  const revokeCameraAccess = () => {
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-    setField('cv_monitoring_enabled', false);
-    setCameraStatus('idle');
-
-    startSaving(async () => {
-      const nextSettings = saveSettingsProfile({
-        ...settings,
-        cv_monitoring_enabled: false,
-      });
-      setSettings(nextSettings);
-      setStatus({
-        type: 'success',
-        message: 'Camera access revoked and monitoring disabled locally.',
-      });
-    });
-  };
-
-  const updatePassword = () => {
-    startChangingPassword(async () => {
-      setStatus({
-        type: 'error',
-        message:
-          'Password changes are managed by your Google account, not this frontend-only app.',
-      });
-      setPassword('');
-    });
-  };
-
-  const exportData = () => {
-    startExporting(async () => {
-      const exportPayload = {
-        exported_at: new Date().toISOString(),
-        settings: readSettingsProfile(),
-        onboarding: readOnboardingState(),
-        preferenceSummary: readPreferenceSummary(),
-      };
-
-      const blob = new Blob([JSON.stringify(exportPayload, null, 2)], {
-        type: 'application/json',
-      });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      const timestamp = new Date()
-        .toISOString()
-        .slice(0, 19)
-        .replace(/:/g, '-');
-      anchor.href = url;
-      anchor.download = `stasis-data-export-${timestamp}.json`;
-      anchor.click();
-      URL.revokeObjectURL(url);
-
-      setStatus({
-        type: 'success',
-        message: 'Local app data export downloaded.',
-      });
-    });
-  };
-
-  const deleteAccount = () => {
-    const confirmed = window.confirm(
-      'Clear local Stasis data stored in this browser? Your Google account will not be deleted.'
-    );
-
-    if (!confirmed) {
+    if (status.type !== 'success') {
       return;
     }
 
-    startDeletingAccount(async () => {
-      clearFrontendAppState();
-      setSettings((prev) => ({
-        ...createInitialSettingsState(),
-        email: prev.email ?? null,
-      }));
-      setStatus({
-        type: 'success',
-        message:
-          'Local study data cleared. Your authenticated account is unchanged.',
-      });
+    const timeout = window.setTimeout(() => {
+      setStatus({ type: 'idle', message: '' });
+    }, 1800);
+
+    return () => window.clearTimeout(timeout);
+  }, [status.type]);
+
+  useEffect(() => {
+    if (!isDirty) {
+      return;
+    }
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    const handleDocumentClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      const link = target?.closest('a[href]');
+
+      if (!link) {
+        return;
+      }
+
+      const shouldLeave = window.confirm('Discard unsaved settings changes?');
+
+      if (!shouldLeave) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('click', handleDocumentClick, true);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('click', handleDocumentClick, true);
+    };
+  }, [isDirty]);
+
+  const updateDraft = (patch: Partial<UserPreferences>) => {
+    setStatus({ type: 'idle', message: '' });
+    setDraftPreferences((current) => {
+      const next = { ...current, ...patch };
+
+      if (
+        patch.privacy_comfort === 'off' &&
+        current.privacy_comfort !== 'off'
+      ) {
+        previousCameraChoicesRef.current = {
+          emotion_detection: current.emotion_detection,
+          break_mechanic: current.break_mechanic,
+        };
+      }
+
+      if (
+        patch.privacy_comfort &&
+        patch.privacy_comfort !== 'off' &&
+        current.privacy_comfort === 'off'
+      ) {
+        next.emotion_detection =
+          previousCameraChoicesRef.current.emotion_detection;
+        next.break_mechanic = previousCameraChoicesRef.current.break_mechanic;
+      }
+
+      const normalized = normalizeRuntimePreferences(next);
+
+      if (normalized.privacy_comfort !== 'off') {
+        previousCameraChoicesRef.current = {
+          emotion_detection: normalized.emotion_detection,
+          break_mechanic: normalized.break_mechanic,
+        };
+      }
+
+      return normalized;
     });
   };
 
+  const saveChanges = () => {
+    if (!isDirty) {
+      return;
+    }
+
+    const preferences = normalizeRuntimePreferences(draftPreferences);
+    setStatus({ type: 'idle', message: '' });
+
+    startSaving(async () => {
+      try {
+        const response = await saveRuntimePreferences(preferences);
+        const saved = normalizeRuntimePreferences(response.preferences);
+        setSavedPreferences(saved);
+        setDraftPreferences(saved);
+        setOnboardingSnapshot(
+          response.onboarding_snapshot ??
+            runtimePreferencesFromOnboardingState()
+        );
+        saveRuntimePreferencesToLocalProfile(saved);
+        setForceDirty(false);
+        setStatus({ type: 'success', message: 'Saved' });
+      } catch {
+        console.warn(
+          'Saved runtime preferences locally until backend preferences are available.'
+        );
+        setSavedPreferences(preferences);
+        setDraftPreferences(preferences);
+        setOnboardingSnapshot(
+          (current) => current ?? runtimePreferencesFromOnboardingState()
+        );
+        saveRuntimePreferencesToLocalProfile(preferences);
+        setForceDirty(false);
+        setStatus({ type: 'success', message: 'Saved locally' });
+      }
+    });
+  };
+
+  const resetToOnboardingDefaults = () => {
+    if (!onboardingSnapshot) {
+      return;
+    }
+
+    const snapshot = normalizeRuntimePreferences(onboardingSnapshot);
+    setDraftPreferences(snapshot);
+    setForceDirty(true);
+    setStatus({ type: 'idle', message: '' });
+
+    if (snapshot.privacy_comfort !== 'off') {
+      previousCameraChoicesRef.current = {
+        emotion_detection: snapshot.emotion_detection,
+        break_mechanic: snapshot.break_mechanic,
+      };
+    }
+  };
+
+  const cameraOff = draftPreferences.privacy_comfort === 'off';
+
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-[#f0f0eb]">Settings</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage study behavior, camera monitoring, reminders, and account
-            details.
-          </p>
+    <div className="mx-auto max-w-[642px] space-y-5 pb-10 text-[#f3f1eb]">
+      <div className="sticky top-0 z-20 -mx-2 flex items-center justify-between gap-4 bg-[#1f1e1d]/95 px-2 py-3 backdrop-blur">
+        <h1 className="text-xl font-bold tracking-tight text-[#f5f3ed]">
+          Settings
+        </h1>
+        <div className="flex items-center gap-3">
+          {status.type !== 'idle' && (
+            <span
+              className={cn(
+                'text-xs font-semibold',
+                status.type === 'success' ? 'text-[#baf6df]' : 'text-[#ffb4a8]'
+              )}
+            >
+              {status.message}
+            </span>
+          )}
+          <Button
+            type="button"
+            disabled={!isDirty || isSaving || isLoading}
+            onClick={saveChanges}
+            className="min-w-32 rounded-md border-[#45433f] bg-[#2d2d2b] text-[#f5f3ed] shadow-none hover:bg-[#3a3a36] disabled:bg-[#262624] disabled:text-[#8c8982]"
+          >
+            {status.type === 'success' ? (
+              <>
+                <Check className="h-4 w-4" />
+                Saved
+              </>
+            ) : isSaving ? (
+              'Saving...'
+            ) : (
+              'Save changes'
+            )}
+          </Button>
         </div>
-        <Button
-          onClick={saveAllSettings}
-          disabled={isSaving || isDeletingAccount}
-        >
-          {isSaving ? 'Saving...' : 'Save all changes'}
-        </Button>
       </div>
 
-      {status.type !== 'idle' && (
-        <Alert variant={statusTone}>
-          <AlertTitle>
-            {status.type === 'success' ? 'Success' : 'Update failed'}
-          </AlertTitle>
-          <AlertDescription>{status.message}</AlertDescription>
-        </Alert>
-      )}
+      {isLoading ? (
+        <Card className="rounded-lg border-[#55534e] bg-[#2f302e] p-5 text-sm text-[#c6c3bb] shadow-none">
+          Loading preferences...
+        </Card>
+      ) : (
+        <>
+          <Section title="Camera & Privacy">
+            <SettingRow
+              title="Camera during study"
+              description="Controls whether the camera is active and visible in study mode"
+            >
+              <SegmentedControl<PrivacyComfort>
+                ariaLabel="Camera privacy"
+                value={draftPreferences.privacy_comfort}
+                options={[
+                  { value: 'visible', label: 'Visible' },
+                  { value: 'hidden', label: 'Hidden' },
+                  { value: 'off', label: 'Off' },
+                ]}
+                onChange={(value) => updateDraft({ privacy_comfort: value })}
+              />
+            </SettingRow>
 
-      <Card className="bg-[#242322]">
-        <CardHeader>
-          <CardTitle>Study Preferences</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-5 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="focusGoal">Focus session length (minutes)</Label>
-            <Input
-              id="focusGoal"
-              type="number"
-              min={5}
-              max={120}
-              value={settings.focus_goal_minutes ?? 25}
-              onChange={(e) =>
-                setField('focus_goal_minutes', Number(e.target.value))
-              }
+            <SettingRow
+              title="Emotion detection"
+              description="Run computer vision in the background to detect frustration and fatigue"
+              className={cameraOff ? 'opacity-70' : undefined}
+            >
+              <ToggleControl
+                id="emotionDetection"
+                checked={draftPreferences.emotion_detection}
+                disabled={cameraOff}
+                onCheckedChange={(checked) =>
+                  updateDraft({ emotion_detection: checked })
+                }
+              />
+            </SettingRow>
+          </Section>
+
+          <Section title="Focus Expression">
+            <SettingRow
+              title="My concentration face"
+              description="Helps calibrate the emotion model to avoid false frustration alerts"
+            >
+              <SegmentedControl<ExpressionTolerance>
+                ariaLabel="Expression tolerance"
+                value={draftPreferences.expression_tolerance}
+                options={[
+                  { value: 'neutral', label: 'Neutral' },
+                  { value: 'intense', label: 'Intense' },
+                  { value: 'variable', label: 'Variable' },
+                ]}
+                onChange={(value) =>
+                  updateDraft({ expression_tolerance: value })
+                }
+              />
+            </SettingRow>
+          </Section>
+
+          <Section title="Study Rhythm">
+            <SliderRow
+              title="Study block length"
+              description="How long each Pomodoro work interval runs"
+              min={15}
+              max={90}
+              step={5}
+              value={draftPreferences.study_block_length}
+              label={`${draftPreferences.study_block_length} min`}
+              onChange={(value) => updateDraft({ study_block_length: value })}
             />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="shortBreak">Short break length (minutes)</Label>
-            <Input
-              id="shortBreak"
-              type="number"
+            <SliderRow
+              title="Mini breaks per session"
+              description="Short pauses distributed within one study session (1-3)"
               min={1}
+              max={3}
+              step={1}
+              value={draftPreferences.mini_breaks_per_session}
+              label={`${draftPreferences.mini_breaks_per_session} breaks`}
+              onChange={(value) =>
+                updateDraft({ mini_breaks_per_session: value })
+              }
+            />
+          </Section>
+
+          <Section title="Break Behaviour">
+            <SettingRow
+              title="Break mechanic"
+              description="Accountable mode: break timer only starts once the camera sees you've left the frame"
+            >
+              <div className="space-y-1 text-right">
+                <SegmentedControl<BreakMechanic>
+                  ariaLabel="Break mechanic"
+                  value={draftPreferences.break_mechanic}
+                  options={[
+                    { value: 'relaxed', label: 'Relaxed' },
+                    {
+                      value: 'accountable',
+                      label: 'Accountable',
+                      disabled: cameraOff,
+                      title: cameraOff ? 'Requires camera' : undefined,
+                    },
+                  ]}
+                  onChange={(value) => updateDraft({ break_mechanic: value })}
+                />
+                {cameraOff && (
+                  <p className="text-xs font-semibold text-[#aaa7a0]">
+                    Requires camera
+                  </p>
+                )}
+              </div>
+            </SettingRow>
+            <SliderRow
+              title="Recovery window"
+              description="Cooldown after a frustration event before the app re-prompts you"
+              min={3}
               max={30}
-              value={settings.break_duration_minutes ?? 5}
-              onChange={(e) =>
-                setField('break_duration_minutes', Number(e.target.value))
-              }
+              step={1}
+              value={draftPreferences.recovery_duration}
+              label={`${draftPreferences.recovery_duration} min`}
+              onChange={(value) => updateDraft({ recovery_duration: value })}
             />
-          </div>
+          </Section>
 
-          <div className="space-y-2">
-            <Label htmlFor="longBreak">Long break length (minutes)</Label>
-            <Input
-              id="longBreak"
-              type="number"
-              min={10}
-              max={60}
-              value={settings.long_break_duration_minutes ?? 20}
-              onChange={(e) =>
-                setField('long_break_duration_minutes', Number(e.target.value))
-              }
-            />
-            <p className="text-xs text-muted-foreground">
-              Triggers after every 4 Pomodoros.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="dailyGoal">Daily card review goal</Label>
-            <Input
-              id="dailyGoal"
-              type="number"
-              min={5}
-              max={200}
-              value={settings.daily_goal_cards ?? 20}
-              onChange={(e) =>
-                setField('daily_goal_cards', Number(e.target.value))
-              }
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="cardSort">Default card sort order</Label>
-            <select
-              id="cardSort"
-              value={settings.default_card_sort ?? 'due_date'}
-              onChange={(e) =>
-                setField('default_card_sort', e.target.value as DefaultCardSort)
-              }
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          <Section title="Timer Display">
+            <SettingRow
+              title="Show countdown during focus mode"
+              description="If off, the timer still runs - you'll get a notification when time's up"
             >
-              {sortOptions.map((option) => (
-                <option
-                  key={option.value}
-                  value={option.value}
-                  className="bg-[#242322]"
-                >
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-center gap-3 rounded-md border border-[#3d3c3b] p-3">
-            <Checkbox
-              id="shortcutsEnabled"
-              checked={settings.shortcuts_enabled ?? true}
-              onCheckedChange={(checked) =>
-                setField('shortcuts_enabled', checked === true)
-              }
-            />
-            <div>
-              <Label htmlFor="shortcutsEnabled">
-                Enable keyboard shortcuts for card review
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                Supports 1-4 number key answers.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-[#242322]">
-        <CardHeader>
-          <CardTitle>CV Monitoring</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <div className="flex items-center gap-3 rounded-md border border-[#3d3c3b] p-3">
-            <Checkbox
-              id="cvMonitoring"
-              checked={settings.cv_monitoring_enabled ?? false}
-              onCheckedChange={(checked) =>
-                setField('cv_monitoring_enabled', checked === true)
-              }
-            />
-            <Label htmlFor="cvMonitoring">Enable webcam monitoring</Label>
-          </div>
-
-          {showCameraPreview && (
-            <div className="space-y-2">
-              <Label>Live webcam preview</Label>
-              <video
-                ref={videoRef}
-                className="h-56 w-full rounded-md border border-[#3d3c3b] bg-black object-cover"
-                autoPlay
-                muted
-                playsInline
-              />
-              <p className="text-xs text-muted-foreground">
-                {cameraStatus === 'requesting' && 'Requesting camera access...'}
-                {cameraStatus === 'active' && 'Camera connected.'}
-                {cameraStatus === 'blocked' &&
-                  'Camera access blocked. Check browser permission settings.'}
-              </p>
-            </div>
-          )}
-
-          <div className="grid gap-5 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label>
-                Burnout detection threshold (
-                {settings.burnout_threshold_minutes} min)
-              </Label>
-              <Slider
-                min={5}
-                max={20}
-                step={1}
-                value={[settings.burnout_threshold_minutes ?? 10]}
-                onValueChange={(v) =>
-                  setField('burnout_threshold_minutes', v[0])
+              <ToggleControl
+                id="showTimer"
+                checked={draftPreferences.show_timer}
+                onCheckedChange={(checked) =>
+                  updateDraft({ show_timer: checked })
                 }
               />
-            </div>
+            </SettingRow>
+          </Section>
 
-            <div className="space-y-2">
-              <Label htmlFor="gazeSensitivity">Gaze tracking sensitivity</Label>
-              <select
-                id="gazeSensitivity"
-                value={settings.gaze_sensitivity ?? 'medium'}
-                onChange={(e) =>
-                  setField(
-                    'gaze_sensitivity',
-                    e.target.value as GazeSensitivity
-                  )
-                }
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                {gazeOptions.map((option) => (
-                  <option
-                    key={option.value}
-                    value={option.value}
-                    className="bg-[#242322]"
-                  >
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <Button
-            onClick={revokeCameraAccess}
-            disabled={isSaving || isDeletingAccount}
-          >
-            Revoke Camera Access
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-[#242322]">
-        <CardHeader>
-          <CardTitle>Appearance & Experience</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-5 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="greetingName">Dashboard greeting name</Label>
-            <div className="flex gap-2">
-              <Input
-                id="greetingName"
-                maxLength={40}
-                value={settings.display_name ?? ''}
-                onChange={(e) =>
-                  setField('display_name', e.target.value.slice(0, 40))
-                }
-              />
+          <Section title="Reset">
+            <SettingRow
+              title="Restore onboarding defaults"
+              description="Reset all preferences to what you set during setup"
+            >
               <Button
-                onClick={saveDisplayName}
-                disabled={isSaving || isDeletingAccount}
+                type="button"
+                variant="outline"
+                disabled={!onboardingSnapshot}
+                onClick={resetToOnboardingDefaults}
+                className="rounded-md border-[#6a6964] bg-transparent px-4 font-semibold text-[#f5f3ed] shadow-none hover:bg-[#3a3a36]"
               >
-                Save
+                Reset to defaults
               </Button>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="heatmapRange">Streak heatmap date range</Label>
-            <select
-              id="heatmapRange"
-              value={settings.heatmap_range_days ?? 30}
-              onChange={(e) =>
-                setField(
-                  'heatmap_range_days',
-                  Number(e.target.value) as 30 | 60 | 90
-                )
-              }
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
-              <option value={30} className="bg-[#242322]">
-                30 days
-              </option>
-              <option value={60} className="bg-[#242322]">
-                60 days
-              </option>
-              <option value={90} className="bg-[#242322]">
-                90 days
-              </option>
-            </select>
-          </div>
-
-          <div className="flex items-center gap-3 rounded-md border border-[#3d3c3b] p-3">
-            <Checkbox
-              id="cardAnimation"
-              checked={settings.card_animation_enabled ?? true}
-              onCheckedChange={(checked) =>
-                setField('card_animation_enabled', checked === true)
-              }
-            />
-            <Label htmlFor="cardAnimation">Card flip animation</Label>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="completionSound">Session completion sound</Label>
-            <select
-              id="completionSound"
-              value={settings.completion_sound ?? 'soft_chime'}
-              onChange={(e) =>
-                setField('completion_sound', e.target.value as CompletionSound)
-              }
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
-              {completionSoundOptions.map((option) => (
-                <option
-                  key={option.value}
-                  value={option.value}
-                  className="bg-[#242322]"
-                >
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-[#242322]">
-        <CardHeader>
-          <CardTitle>Notifications</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-5 md:grid-cols-2">
-          <div className="flex items-center gap-3 rounded-md border border-[#3d3c3b] p-3">
-            <Checkbox
-              id="dailyReminder"
-              checked={settings.reminder_enabled ?? false}
-              onCheckedChange={(checked) =>
-                setField('reminder_enabled', checked === true)
-              }
-            />
-            <Label htmlFor="dailyReminder">Daily review reminder</Label>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="reminderTime">Reminder time</Label>
-            <Input
-              id="reminderTime"
-              type="time"
-              value={settings.reminder_time ?? '08:00'}
-              onChange={(e) => setField('reminder_time', e.target.value)}
-            />
-          </div>
-
-          <p className="text-xs text-muted-foreground md:col-span-2">
-            Browser notifications require Stasis to be open.
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-[#242322]">
-        <CardHeader>
-          <CardTitle>Account</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <div className="space-y-1">
-            <Label>Email (read-only)</Label>
-            <Input value={settings.email ?? ''} readOnly />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="accountDisplayName">Change display name</Label>
-            <Input
-              id="accountDisplayName"
-              maxLength={40}
-              value={settings.display_name ?? ''}
-              onChange={(e) =>
-                setField('display_name', e.target.value.slice(0, 40))
-              }
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="password">Change password</Label>
-            <div className="flex gap-2">
-              <Input
-                id="password"
-                type="password"
-                minLength={8}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Minimum 8 characters"
-              />
-              <Button
-                onClick={updatePassword}
-                disabled={isChangingPassword || isDeletingAccount}
-              >
-                {isChangingPassword ? 'Updating...' : 'Update'}
-              </Button>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            <Button
-              onClick={exportData}
-              disabled={isExporting || isDeletingAccount}
-            >
-              {isExporting ? 'Preparing export...' : 'Export data'}
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={deleteAccount}
-              disabled={isDeletingAccount}
-            >
-              {isDeletingAccount
-                ? 'Clearing local data...'
-                : 'Clear local data'}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+            </SettingRow>
+          </Section>
+        </>
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as faceapi from 'face-api.js';
 import type { CVResponse, ConnectionStatus } from '../types';
+import type { ExpressionTolerance } from '@/types/runtime-preferences';
 
 /**
  * Return type for useFaceApiCV hook (compatible with useWebSocketCV)
@@ -26,11 +27,39 @@ const DETECTION_CONFIG = {
   modelPath: '/models',
   /** Target FPS for detection loop (will use requestAnimationFrame) */
   targetFPS: 30,
-  /** Minimum confidence threshold for emotion detection */
-  minConfidence: 0.3,
   /** Confidence threshold for "competing emotions" detection */
   competingEmotionThreshold: 0.1,
 } as const;
+
+const EXPRESSION_TOLERANCE_CONFIG: Record<
+  ExpressionTolerance,
+  {
+    faceScoreThreshold: number;
+    confusionThreshold: number;
+    competingEmotionThreshold: number;
+  }
+> = {
+  neutral: {
+    faceScoreThreshold: 0.55,
+    confusionThreshold: 0.25,
+    competingEmotionThreshold: 0.08,
+  },
+  intense: {
+    faceScoreThreshold: 0.5,
+    confusionThreshold: 0.32,
+    competingEmotionThreshold: 0.12,
+  },
+  variable: {
+    faceScoreThreshold: 0.45,
+    confusionThreshold: 0.22,
+    competingEmotionThreshold: 0.16,
+  },
+};
+
+interface UseFaceApiCVOptions {
+  enabled?: boolean;
+  expressionTolerance?: ExpressionTolerance;
+}
 
 /**
  * Map face-api.js 7 basic emotions to study-specific states
@@ -43,8 +72,10 @@ const DETECTION_CONFIG = {
  * - confused: high negative emotions (fearful, disgusted, angry)
  */
 function mapEmotionsToCVResponse(
-  expressions: faceapi.FaceExpressions
+  expressions: faceapi.FaceExpressions,
+  expressionTolerance: ExpressionTolerance
 ): CVResponse {
+  const toleranceConfig = EXPRESSION_TOLERANCE_CONFIG[expressionTolerance];
   const emotionScores = {
     neutral: expressions.neutral,
     happy: expressions.happy,
@@ -68,7 +99,7 @@ function mapEmotionsToCVResponse(
   // Detect competing emotions (top 2 emotions within threshold)
   const hasCompetingEmotions =
     Math.abs(dominantScore - secondScore) <
-    DETECTION_CONFIG.competingEmotionThreshold;
+    toleranceConfig.competingEmotionThreshold;
 
   // Map to study state
   let studyEmotion: CVResponse['emotion'];
@@ -76,8 +107,8 @@ function mapEmotionsToCVResponse(
 
   // Check for confusion indicators first
   if (
-    emotionScores.fearful > 0.2 ||
-    emotionScores.disgusted > 0.2 ||
+    emotionScores.fearful > toleranceConfig.confusionThreshold ||
+    emotionScores.disgusted > toleranceConfig.confusionThreshold ||
     hasCompetingEmotions
   ) {
     confusion = true;
@@ -144,8 +175,11 @@ function mapEmotionsToCVResponse(
  */
 export function useFaceApiCV(
   // Change: Add | null to the RefObject inner type
-  videoRef: React.RefObject<HTMLVideoElement | null> | undefined
+  videoRef: React.RefObject<HTMLVideoElement | null> | undefined,
+  options: UseFaceApiCVOptions = {}
 ): UseFaceApiCVReturn {
+  const enabled = options.enabled ?? true;
+  const expressionTolerance = options.expressionTolerance ?? 'neutral';
   const [connectionStatus, setConnectionStatus] =
     useState<ConnectionStatus>('disconnected');
   const [latestCVData, setLatestCVData] = useState<CVResponse | null>(null);
@@ -160,7 +194,7 @@ export function useFaceApiCV(
    * Load face-api.js models
    */
   const loadModels = useCallback(async () => {
-    if (isUnmountingRef.current) return;
+    if (isUnmountingRef.current || !enabled) return;
 
     setConnectionStatus('connecting');
     setError(null);
@@ -189,7 +223,7 @@ export function useFaceApiCV(
       );
       setIsModelLoaded(false);
     }
-  }, []);
+  }, [enabled]);
 
   /**
    * Run single detection cycle
@@ -198,6 +232,7 @@ export function useFaceApiCV(
     const video = videoRef?.current;
 
     if (
+      !enabled ||
       !video ||
       video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA ||
       !isModelLoaded
@@ -212,7 +247,9 @@ export function useFaceApiCV(
           video,
           new faceapi.TinyFaceDetectorOptions({
             inputSize: 224,
-            scoreThreshold: 0.5,
+            scoreThreshold:
+              EXPRESSION_TOLERANCE_CONFIG[expressionTolerance]
+                .faceScoreThreshold,
           })
         )
         .withFaceExpressions();
@@ -222,7 +259,10 @@ export function useFaceApiCV(
       // Process only the first face (single user assumption)
       if (detections.length > 0) {
         const firstDetection = detections[0];
-        const cvResponse = mapEmotionsToCVResponse(firstDetection.expressions);
+        const cvResponse = mapEmotionsToCVResponse(
+          firstDetection.expressions,
+          expressionTolerance
+        );
         setLatestCVData(cvResponse);
         setError(null);
       } else {
@@ -235,7 +275,7 @@ export function useFaceApiCV(
       console.error('Face detection error:', err);
       setError('Face detection error. Please check your camera.');
     }
-  }, [videoRef, isModelLoaded]);
+  }, [enabled, expressionTolerance, videoRef, isModelLoaded]);
 
   /**
    * Detection loop using requestAnimationFrame
@@ -277,13 +317,21 @@ export function useFaceApiCV(
    */
   useEffect(() => {
     isUnmountingRef.current = false;
-    loadModels();
+
+    if (enabled) {
+      loadModels();
+    } else {
+      stopDetectionLoop();
+      setConnectionStatus('disconnected');
+      setLatestCVData(null);
+      setError(null);
+    }
 
     return () => {
       isUnmountingRef.current = true;
       stopDetectionLoop();
     };
-  }, [loadModels, stopDetectionLoop]);
+  }, [enabled, loadModels, stopDetectionLoop]);
 
   /**
    * Start/stop detection loop based on model and video readiness
@@ -291,6 +339,7 @@ export function useFaceApiCV(
   useEffect(() => {
     const video = videoRef?.current;
     const shouldRun =
+      enabled &&
       isModelLoaded &&
       video &&
       video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA;
@@ -304,7 +353,7 @@ export function useFaceApiCV(
     return () => {
       stopDetectionLoop();
     };
-  }, [isModelLoaded, videoRef, startDetectionLoop, stopDetectionLoop]);
+  }, [enabled, isModelLoaded, videoRef, startDetectionLoop, stopDetectionLoop]);
 
   return {
     connectionStatus,

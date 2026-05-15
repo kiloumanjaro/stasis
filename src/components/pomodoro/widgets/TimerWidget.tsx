@@ -27,6 +27,8 @@ interface TimerSettings {
 
 interface TimerWidgetProps {
   initialSettings?: Partial<TimerSettings>;
+  cameraEnabled?: boolean;
+  showTimer?: boolean;
 }
 
 const DEFAULT_SETTINGS: TimerSettings = {
@@ -48,17 +50,37 @@ let persistedState: {
   totalBreakTime: number;
 } | null = null;
 
-export function TimerWidget({ initialSettings }: TimerWidgetProps) {
+export function TimerWidget({
+  initialSettings,
+  cameraEnabled = true,
+  showTimer = true,
+}: TimerWidgetProps) {
+  const initialFocusDuration = initialSettings?.focusDuration;
+  const initialShortBreakDuration = initialSettings?.shortBreakDuration;
+  const initialLongBreakDuration = initialSettings?.longBreakDuration;
+  const initialSessionsBeforeLongBreak =
+    initialSettings?.sessionsBeforeLongBreak;
   const resolvedInitialSettings = useMemo(
     () => ({
       ...DEFAULT_SETTINGS,
-      ...initialSettings,
+      ...(initialFocusDuration !== undefined
+        ? { focusDuration: initialFocusDuration }
+        : {}),
+      ...(initialShortBreakDuration !== undefined
+        ? { shortBreakDuration: initialShortBreakDuration }
+        : {}),
+      ...(initialLongBreakDuration !== undefined
+        ? { longBreakDuration: initialLongBreakDuration }
+        : {}),
+      ...(initialSessionsBeforeLongBreak !== undefined
+        ? { sessionsBeforeLongBreak: initialSessionsBeforeLongBreak }
+        : {}),
     }),
     [
-      initialSettings?.focusDuration,
-      initialSettings?.shortBreakDuration,
-      initialSettings?.longBreakDuration,
-      initialSettings?.sessionsBeforeLongBreak,
+      initialFocusDuration,
+      initialLongBreakDuration,
+      initialSessionsBeforeLongBreak,
+      initialShortBreakDuration,
     ]
   );
 
@@ -132,8 +154,10 @@ export function TimerWidget({ initialSettings }: TimerWidgetProps) {
   cameraRef.current = camera;
 
   useEffect(() => {
-    cameraRef.current?.setSessionActive(isRunning && mode === 'focus');
-  }, [isRunning, mode]);
+    cameraRef.current?.setSessionActive(
+      cameraEnabled && isRunning && mode === 'focus'
+    );
+  }, [cameraEnabled, isRunning, mode]);
 
   useEffect(() => {
     return () => {
@@ -359,6 +383,8 @@ export function TimerWidget({ initialSettings }: TimerWidgetProps) {
   // Calculate progress percentage
   const totalDuration = getDurationForMode(mode);
   const progress = ((totalDuration - displayTime) / totalDuration) * 100;
+  const shouldShowCountdown = showTimer || mode !== 'focus';
+  const displayedProgress = shouldShowCountdown ? progress : 0;
 
   return (
     <div className="flex flex-col gap-4">
@@ -384,14 +410,14 @@ export function TimerWidget({ initialSettings }: TimerWidgetProps) {
           className="relative flex h-40 w-40 items-center justify-center rounded-full bg-muted"
           style={{
             background: `conic-gradient(
-              hsl(var(--primary)) ${progress}%, 
-              hsl(var(--muted)) ${progress}%
+              hsl(var(--primary)) ${displayedProgress}%, 
+              hsl(var(--muted)) ${displayedProgress}%
             )`,
           }}
         >
           <div className="flex h-36 w-36 items-center justify-center rounded-full bg-background">
             <span className="text-3xl font-bold tabular-nums tracking-tight">
-              {formatTime(displayTime)}
+              {shouldShowCountdown ? formatTime(displayTime) : 'Focus'}
             </span>
           </div>
         </div>
