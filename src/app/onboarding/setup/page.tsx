@@ -26,7 +26,6 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import type { UserPreferences } from '@/types/onboarding';
 import {
-  saveOnboardingState,
   markOnboardingComplete,
   type OnboardingState,
 } from '@/lib/frontend-store';
@@ -217,7 +216,7 @@ export default function OnboardingSetupPage() {
       case 4:
         return true;
       case 5:
-        return breakMechanic !== null;
+        return privacyComfort === 'off' || breakMechanic !== null;
       case 6:
         return showTimer !== null;
       default:
@@ -270,8 +269,7 @@ export default function OnboardingSetupPage() {
 
   const handleComplete = useCallback(() => {
     setCompleting(true);
-    saveOnboardingState(buildPreferences());
-    markOnboardingComplete();
+    markOnboardingComplete(buildPreferences());
     router.push('/dashboard');
   }, [buildPreferences, router]);
 

@@ -7,10 +7,3 @@ export interface UserPreferences {
   break_mechanic: 'relaxed' | 'accountable';
   show_timer: boolean;
 }
-
-/** @deprecated — kept for backwards compatibility with old onboarding data */
-export interface StudyPreferences {
-  focusGoalMinutes: number;
-  breakDurationMinutes: number;
-  dailyGoalCards: number;
-}

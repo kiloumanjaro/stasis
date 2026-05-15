@@ -12,6 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getBackendUser } from '@/lib/backend-auth';
 import {
   clearFrontendAppState,
+  DEFAULT_ONBOARDING_STATE,
   DEFAULT_SETTINGS_PROFILE,
   readOnboardingState,
   readPreferenceSummary,
@@ -44,6 +45,23 @@ const completionSoundOptions: Array<{ value: CompletionSound; label: string }> =
     { value: 'bell', label: 'Bell' },
   ];
 
+const privacyOptions = [
+  { value: 'visible', label: 'Visible' },
+  { value: 'hidden', label: 'Hidden' },
+  { value: 'off', label: 'Off' },
+] as const;
+
+const expressionOptions = [
+  { value: 'neutral', label: 'Neutral' },
+  { value: 'intense', label: 'Intense' },
+  { value: 'variable', label: 'Variable' },
+] as const;
+
+const breakMechanicOptions = [
+  { value: 'relaxed', label: 'Relaxed' },
+  { value: 'accountable', label: 'Accountable' },
+] as const;
+
 function toBool(value: unknown, fallback: boolean) {
   return typeof value === 'boolean' ? value : fallback;
 }
@@ -55,6 +73,16 @@ function toNum(value: unknown, fallback: number) {
 
 function createInitialSettingsState(): SettingsProfile {
   return {
+    privacy_comfort: DEFAULT_ONBOARDING_STATE.privacy_comfort,
+    expression_tolerance: DEFAULT_ONBOARDING_STATE.expression_tolerance,
+    study_block_length: toNum(DEFAULT_ONBOARDING_STATE.study_block_length, 25),
+    mini_breaks_per_session: toNum(
+      DEFAULT_ONBOARDING_STATE.mini_breaks_per_session,
+      2
+    ),
+    recovery_duration: toNum(DEFAULT_ONBOARDING_STATE.recovery_duration, 10),
+    break_mechanic: DEFAULT_ONBOARDING_STATE.break_mechanic,
+    show_timer: toBool(DEFAULT_ONBOARDING_STATE.show_timer, true),
     focus_goal_minutes: toNum(DEFAULT_SETTINGS_PROFILE.focus_goal_minutes, 25),
     break_duration_minutes: toNum(
       DEFAULT_SETTINGS_PROFILE.break_duration_minutes,
@@ -204,6 +232,15 @@ export function SettingsContent() {
     setSettings((prev) => ({ ...prev, [key]: value }));
   };
 
+  useEffect(() => {
+    if (
+      settings.privacy_comfort === 'off' &&
+      settings.break_mechanic === 'accountable'
+    ) {
+      setField('break_mechanic', 'relaxed');
+    }
+  }, [settings.privacy_comfort, settings.break_mechanic]);
+
   const saveAllSettings = () => {
     setStatus({ type: 'idle', message: '' });
 
@@ -342,6 +379,154 @@ export function SettingsContent() {
           <AlertDescription>{status.message}</AlertDescription>
         </Alert>
       )}
+
+      <Card className="bg-[#242322]">
+        <CardHeader>
+          <CardTitle>Onboarding Preferences</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-5 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="privacyComfort">Camera privacy</Label>
+            <select
+              id="privacyComfort"
+              value={settings.privacy_comfort ?? 'visible'}
+              onChange={(e) =>
+                setField(
+                  'privacy_comfort',
+                  e.target.value as 'visible' | 'hidden' | 'off'
+                )
+              }
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              {privacyOptions.map((option) => (
+                <option
+                  key={option.value}
+                  value={option.value}
+                  className="bg-[#242322]"
+                >
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="expressionTolerance">Expression tolerance</Label>
+            <select
+              id="expressionTolerance"
+              value={settings.expression_tolerance ?? 'neutral'}
+              onChange={(e) =>
+                setField(
+                  'expression_tolerance',
+                  e.target.value as 'neutral' | 'intense' | 'variable'
+                )
+              }
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              {expressionOptions.map((option) => (
+                <option
+                  key={option.value}
+                  value={option.value}
+                  className="bg-[#242322]"
+                >
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="studyBlockLength">
+              Study block length (minutes)
+            </Label>
+            <Input
+              id="studyBlockLength"
+              type="number"
+              min={15}
+              max={90}
+              value={settings.study_block_length ?? 25}
+              onChange={(e) =>
+                setField('study_block_length', Number(e.target.value))
+              }
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="miniBreaks">Mini breaks per session</Label>
+            <Input
+              id="miniBreaks"
+              type="number"
+              min={1}
+              max={3}
+              value={settings.mini_breaks_per_session ?? 2}
+              onChange={(e) =>
+                setField('mini_breaks_per_session', Number(e.target.value))
+              }
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="recoveryDuration">
+              Recovery duration (minutes)
+            </Label>
+            <Input
+              id="recoveryDuration"
+              type="number"
+              min={3}
+              max={30}
+              value={settings.recovery_duration ?? 10}
+              onChange={(e) =>
+                setField('recovery_duration', Number(e.target.value))
+              }
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="breakMechanic">Break mechanic</Label>
+            <select
+              id="breakMechanic"
+              value={settings.break_mechanic ?? 'relaxed'}
+              disabled={settings.privacy_comfort === 'off'}
+              onChange={(e) =>
+                setField(
+                  'break_mechanic',
+                  e.target.value as 'relaxed' | 'accountable'
+                )
+              }
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60"
+            >
+              {breakMechanicOptions.map((option) => (
+                <option
+                  key={option.value}
+                  value={option.value}
+                  className="bg-[#242322]"
+                >
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            {settings.privacy_comfort === 'off' && (
+              <p className="text-xs text-muted-foreground">
+                Accountable mode requires camera privacy to be visible or
+                hidden.
+              </p>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3 rounded-md border border-[#3d3c3b] p-3 md:col-span-2">
+            <Checkbox
+              id="showTimer"
+              checked={settings.show_timer ?? true}
+              onCheckedChange={(checked) =>
+                setField('show_timer', checked === true)
+              }
+            />
+            <Label htmlFor="showTimer">
+              Show Pomodoro timer during study sessions
+            </Label>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="bg-[#242322]">
         <CardHeader>
