@@ -8,6 +8,7 @@ import type { AdaptiveStudyParameters } from '@/types/preferences';
 export type DefaultCardSort = 'due_date' | 'difficulty' | 'random';
 export type GazeSensitivity = 'low' | 'medium' | 'high';
 export type CompletionSound = 'none' | 'soft_chime' | 'bell';
+export type PrivacyComfort = 'visible' | 'hidden';
 
 export interface SettingsProfile {
   id?: string;
@@ -27,6 +28,8 @@ export interface SettingsProfile {
   completion_sound?: CompletionSound | null;
   reminder_enabled?: boolean | null;
   reminder_time?: string | null;
+  privacy_comfort?: PrivacyComfort | null;
+  expression_tolerance?: number | null;
 }
 
 export interface OnboardingState {
@@ -86,6 +89,8 @@ export const DEFAULT_SETTINGS_PROFILE: SettingsProfile = {
   reminder_time: '08:00',
   display_name: null,
   email: null,
+  privacy_comfort: 'visible',
+  expression_tolerance: 0.5,
 };
 
 export const DEFAULT_ONBOARDING_STATE: OnboardingState = {
@@ -405,7 +410,51 @@ export function clearFrontendAppState() {
     ONBOARDING_STORAGE_KEY,
     PREFERENCE_SUMMARY_STORAGE_KEY,
     FLASHCARD_STORAGE_KEY,
+    EMOTION_HISTORY_STORAGE_KEY,
   ].forEach((storageKey) => {
     window.localStorage.removeItem(storageKey);
   });
+}
+
+// ---------------------------------------------------------------------------
+// Emotion session history persistence
+// ---------------------------------------------------------------------------
+
+const EMOTION_HISTORY_STORAGE_KEY = 'stasis-emotion-history';
+
+export interface EmotionSessionEntry {
+  emotion: string;
+  confidence: number;
+  timestamp: number;
+}
+
+export interface EmotionSessionRecord {
+  sessionId: string;
+  startedAt: number;
+  endedAt: number;
+  entries: EmotionSessionEntry[];
+}
+
+interface EmotionHistoryStore {
+  sessions: EmotionSessionRecord[];
+}
+
+function getDefaultEmotionHistoryStore(): EmotionHistoryStore {
+  return { sessions: [] };
+}
+
+export function readEmotionHistory(): EmotionSessionRecord[] {
+  return readJson<EmotionHistoryStore>(
+    EMOTION_HISTORY_STORAGE_KEY,
+    getDefaultEmotionHistoryStore()
+  ).sessions;
+}
+
+export function saveEmotionSession(session: EmotionSessionRecord) {
+  const store = readJson<EmotionHistoryStore>(
+    EMOTION_HISTORY_STORAGE_KEY,
+    getDefaultEmotionHistoryStore()
+  );
+  store.sessions = [...store.sessions, session];
+  writeJson(EMOTION_HISTORY_STORAGE_KEY, store);
 }
