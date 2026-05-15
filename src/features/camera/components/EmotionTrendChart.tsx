@@ -203,14 +203,6 @@ export function EmotionTrendChart({
     ];
   }, [chartData]);
 
-  // Determine dominant emotion for line color
-  const dominantEmotionColor = useMemo((): string => {
-    const dominant = emotionStats.reduce((prev, curr) =>
-      curr.percentage > prev.percentage ? curr : prev
-    );
-    return dominant.color;
-  }, [emotionStats]);
-
   // Empty state — should rarely show since we have dummy fallback
   if (chartData.length === 0) {
     return (
@@ -236,6 +228,31 @@ export function EmotionTrendChart({
           data={chartData}
           margin={{ top: 8, right: 12, bottom: 4, left: -8 }}
         >
+          <defs>
+            <linearGradient
+              id="emotionLineGradient"
+              x1="0%"
+              y1="0%"
+              x2="100%"
+              y2="0%"
+            >
+              <stop
+                offset="0%"
+                stopColor={EMOTION_LINE_COLORS.happy}
+                stopOpacity={0.9}
+              />
+              <stop
+                offset="50%"
+                stopColor={EMOTION_LINE_COLORS.focused}
+                stopOpacity={0.9}
+              />
+              <stop
+                offset="100%"
+                stopColor={EMOTION_LINE_COLORS.confused}
+                stopOpacity={0.9}
+              />
+            </linearGradient>
+          </defs>
           <CartesianGrid
             strokeDasharray="3 3"
             stroke="hsl(60 3% 28% / 0.3)"
@@ -263,7 +280,7 @@ export function EmotionTrendChart({
           <Line
             type="monotone"
             dataKey="value"
-            stroke={dominantEmotionColor}
+            stroke="url(#emotionLineGradient)"
             strokeWidth={2}
             dot={false}
             activeDot={false}
