@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { Icon } from '@iconify/react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,15 +21,20 @@ interface DraggableWidgetProps {
   title: string;
   zIndex: number;
   children: ReactNode;
-  /** Width of the widget in pixels */
   width?: number;
-  /** Minimum height of the widget in pixels */
   minHeight?: number;
   className?: string;
 }
 
-export function DraggableWidget({
-  isOpen,
+type ContentProps = Omit<DraggableWidgetProps, 'isOpen'>;
+
+/**
+ * Inner component — only mounts when the widget is open.
+ * This ensures useDrag captures the correct initialPosition
+ * (which is computed by the parent's useEffect before the user
+ * ever toggles a widget open).
+ */
+function DraggableWidgetContent({
   onMinimize,
   onFocus,
   initialPosition,
@@ -39,34 +44,69 @@ export function DraggableWidget({
   width = 320,
   minHeight = 400,
   className,
-}: DraggableWidgetProps) {
+}: ContentProps) {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
   const { position, isDragging, handleMouseDown } = useDrag({
     initialPosition,
     elementWidth: width,
     elementHeight: minHeight,
   });
 
-  if (!isOpen) return null;
+  if (isMobile) {
+    return (
+      <div
+        className="fixed bottom-0 left-0 right-0 rounded-t-xl border-t border-border/50 bg-card/95 shadow-2xl backdrop-blur-sm"
+        style={{ zIndex }}
+        onMouseDown={onFocus}
+      >
+        <div className="flex items-center justify-between border-b border-border/50 p-3">
+          <div className="flex items-center gap-2">
+            <GripHorizontal className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">{title}</span>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-none bg-none"
+            onClick={(e) => {
+              e.stopPropagation();
+              onMinimize();
+            }}
+          >
+            <Icon icon="bi:x" className="h-10 text-white" />
+          </Button>
+        </div>
+        <div className="max-h-[60vh] overflow-y-auto p-3">{children}</div>
+      </div>
+    );
+  }
 
   return (
     <Card
       className={cn(
-        'fixed border-border/50 bg-card/95 shadow-xl backdrop-blur-sm',
+        'fixed rounded-xl border-border/50 bg-card/95 shadow-lg backdrop-blur-sm',
         isDragging && 'cursor-grabbing',
         className
       )}
       style={{
         left: position.x,
         top: position.y,
-        width: width,
-        minHeight: minHeight,
-        zIndex: zIndex,
+        width,
+        minHeight,
+        zIndex,
       }}
       onMouseDown={onFocus}
     >
       <CardHeader className="border-b border-border/50 p-3 pb-2">
         <div className="flex items-center justify-between">
-          {/* Drag Handle */}
           <div
             className="flex cursor-grab select-none items-center gap-2 active:cursor-grabbing"
             onMouseDown={handleMouseDown}
@@ -74,8 +114,6 @@ export function DraggableWidget({
             <GripHorizontal className="ml-2.5 mr-1 h-4 w-4 text-muted-foreground" />
             <span className="text-sm font-medium">{title}</span>
           </div>
-
-          {/* Minimize Button */}
           <Button
             variant="ghost"
             size="icon"
@@ -92,4 +130,17 @@ export function DraggableWidget({
       <CardContent className="p-3">{children}</CardContent>
     </Card>
   );
+}
+
+/**
+ * Public wrapper — renders nothing when closed so that
+ * DraggableWidgetContent (and its useDrag hook) only mounts
+ * after the parent has computed the correct initialPosition.
+ */
+export function DraggableWidget({
+  isOpen,
+  ...contentProps
+}: DraggableWidgetProps) {
+  if (!isOpen) return null;
+  return <DraggableWidgetContent {...contentProps} />;
 }

@@ -390,7 +390,7 @@ export function TimerWidget({ initialSettings }: TimerWidgetProps) {
           }}
         >
           <div className="flex h-36 w-36 items-center justify-center rounded-full bg-background">
-            <span className="font-mono text-3xl font-bold">
+            <span className="text-3xl font-bold tabular-nums tracking-tight">
               {formatTime(displayTime)}
             </span>
           </div>
