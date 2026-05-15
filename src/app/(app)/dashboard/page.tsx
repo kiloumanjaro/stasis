@@ -30,13 +30,28 @@ function DashboardGreetingFallback() {
   );
 }
 
+function DashboardContentFallback() {
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4 md:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="h-32 animate-pulse rounded-lg bg-white/10" />
+        ))}
+      </div>
+      <div className="h-64 animate-pulse rounded-lg bg-white/10" />
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   return (
     <div className="space-y-6 sm:space-y-8">
       <Suspense fallback={<DashboardGreetingFallback />}>
         <DashboardGreetingSection />
       </Suspense>
-      <DashboardContent />
+      <Suspense fallback={<DashboardContentFallback />}>
+        <DashboardContent />
+      </Suspense>
       <Footer />
     </div>
   );

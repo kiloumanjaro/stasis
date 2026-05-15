@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { BookOpen, Timer, Smile } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { completeBackendOnboarding } from '@/lib/backend-onboarding';
 
 const FEATURES = [
@@ -14,7 +14,7 @@ const FEATURES = [
   { icon: Smile, label: 'Mood Monitoring' },
 ] as const;
 
-export default function WelcomePage() {
+function WelcomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [skipping, setSkipping] = useState(false);
@@ -89,5 +89,13 @@ export default function WelcomePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function WelcomePage() {
+  return (
+    <Suspense>
+      <WelcomeContent />
+    </Suspense>
   );
 }

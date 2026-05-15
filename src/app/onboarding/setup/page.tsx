@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -25,7 +25,7 @@ import {
   type PrivacyComfort,
 } from '@/components/onboarding/setup/types';
 
-export default function OnboardingSetupPage() {
+function OnboardingSetupContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [currentStep, setCurrentStep] = useState(1);
@@ -267,5 +267,13 @@ export default function OnboardingSetupPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function OnboardingSetupPage() {
+  return (
+    <Suspense>
+      <OnboardingSetupContent />
+    </Suspense>
   );
 }
