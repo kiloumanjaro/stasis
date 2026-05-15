@@ -4,11 +4,9 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { BookOpen, Timer, Smile } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { useState } from 'react';
-import {
-  markOnboardingComplete,
-  saveOnboardingState,
-} from '@/lib/frontend-store';
+import { markOnboardingComplete } from '@/lib/frontend-store';
 
 const FEATURES = [
   { icon: BookOpen, label: 'AI Flashcards' },
@@ -22,8 +20,7 @@ export default function WelcomePage() {
 
   const handleSkip = async () => {
     setSkipping(true);
-    saveOnboardingState({ skipped: true });
-    markOnboardingComplete();
+    markOnboardingComplete({ skipped: true });
     router.push('/dashboard');
   };
 
@@ -45,21 +42,20 @@ export default function WelcomePage() {
 
         <div className="flex flex-wrap items-center justify-center gap-2">
           {FEATURES.map(({ icon: Icon, label }) => (
-            <div
+            <Badge
               key={label}
-              className="flex items-center gap-1.5 rounded-full border border-[#2A2A35] bg-[#131316] px-3.5 py-1.5"
+              variant="outline"
+              className="flex items-center gap-1.5 rounded-full border-[#2A2A35] bg-[#131316] px-3.5 py-1.5 text-[#9090A8]"
             >
-              <Icon className="h-3.5 w-3.5 text-[#9090A8]" />
-              <span className="text-[13px] font-medium text-[#9090A8]">
-                {label}
-              </span>
-            </div>
+              <Icon className="h-3.5 w-3.5" />
+              <span className="text-[13px] font-medium">{label}</span>
+            </Badge>
           ))}
         </div>
 
         <div className="flex w-full max-w-[320px] flex-col items-center gap-3">
           <Button
-            onClick={() => router.push('/onboarding/preferences')}
+            onClick={() => router.push('/onboarding/setup')}
             className="w-full"
           >
             Get Started

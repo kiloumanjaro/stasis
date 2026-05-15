@@ -13,6 +13,13 @@ export interface SettingsProfile {
   id?: string;
   email?: string | null;
   display_name?: string | null;
+  privacy_comfort?: OnboardingState['privacy_comfort'] | null;
+  expression_tolerance?: OnboardingState['expression_tolerance'] | null;
+  study_block_length?: number | null;
+  mini_breaks_per_session?: number | null;
+  recovery_duration?: number | null;
+  break_mechanic?: OnboardingState['break_mechanic'] | null;
+  show_timer?: boolean | null;
   focus_goal_minutes?: number | null;
   break_duration_minutes?: number | null;
   long_break_duration_minutes?: number | null;
@@ -30,10 +37,13 @@ export interface SettingsProfile {
 }
 
 export interface OnboardingState {
-  focusGoalMinutes: number;
-  breakDurationMinutes: number;
-  dailyGoalCards: number;
-  cvMonitoringEnabled: boolean;
+  privacy_comfort: 'visible' | 'hidden' | 'off';
+  expression_tolerance: 'neutral' | 'intense' | 'variable';
+  study_block_length: number;
+  mini_breaks_per_session: number;
+  recovery_duration: number;
+  break_mechanic: 'relaxed' | 'accountable';
+  show_timer: boolean;
   completed: boolean;
   skipped: boolean;
 }
@@ -70,6 +80,13 @@ const PREFERENCE_SUMMARY_STORAGE_KEY = 'stasis-preference-summary';
 const FLASHCARD_STORAGE_KEY = 'stasis-flashcards';
 
 export const DEFAULT_SETTINGS_PROFILE: SettingsProfile = {
+  privacy_comfort: 'visible',
+  expression_tolerance: 'neutral',
+  study_block_length: 25,
+  mini_breaks_per_session: 2,
+  recovery_duration: 10,
+  break_mechanic: 'relaxed',
+  show_timer: true,
   focus_goal_minutes: 25,
   break_duration_minutes: 5,
   long_break_duration_minutes: 20,
@@ -89,10 +106,13 @@ export const DEFAULT_SETTINGS_PROFILE: SettingsProfile = {
 };
 
 export const DEFAULT_ONBOARDING_STATE: OnboardingState = {
-  focusGoalMinutes: 25,
-  breakDurationMinutes: 5,
-  dailyGoalCards: 20,
-  cvMonitoringEnabled: false,
+  privacy_comfort: 'visible',
+  expression_tolerance: 'neutral',
+  study_block_length: 25,
+  mini_breaks_per_session: 2,
+  recovery_duration: 10,
+  break_mechanic: 'relaxed',
+  show_timer: true,
   completed: false,
   skipped: false,
 };
@@ -182,16 +202,23 @@ export function saveOnboardingState(patch: Partial<OnboardingState>) {
   return nextState;
 }
 
-export function markOnboardingComplete() {
+export function markOnboardingComplete(patch: Partial<OnboardingState> = {}) {
   const onboarding = saveOnboardingState({
+    ...patch,
     completed: true,
   });
 
   saveSettingsProfile({
-    focus_goal_minutes: onboarding.focusGoalMinutes,
-    break_duration_minutes: onboarding.breakDurationMinutes,
-    daily_goal_cards: onboarding.dailyGoalCards,
-    cv_monitoring_enabled: onboarding.cvMonitoringEnabled,
+    privacy_comfort: onboarding.privacy_comfort,
+    expression_tolerance: onboarding.expression_tolerance,
+    study_block_length: onboarding.study_block_length,
+    mini_breaks_per_session: onboarding.mini_breaks_per_session,
+    recovery_duration: onboarding.recovery_duration,
+    break_mechanic: onboarding.break_mechanic,
+    show_timer: onboarding.show_timer,
+    focus_goal_minutes: onboarding.study_block_length,
+    break_duration_minutes: onboarding.recovery_duration,
+    cv_monitoring_enabled: onboarding.privacy_comfort !== 'off',
   });
 
   return onboarding;
