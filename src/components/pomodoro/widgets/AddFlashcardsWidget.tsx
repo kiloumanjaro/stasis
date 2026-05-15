@@ -195,7 +195,21 @@ export function AddFlashcardsWidget(props: AddFlashcardsWidgetProps) {
       const apiDeckId = props.initialDeck?.apiDeckId;
 
       if (props.edit && apiDeckId) {
-        // API deck edit: update/add/delete cards via backend
+        // API deck edit: update deck title/description + update/add/delete cards via backend
+        const updateFields: { name?: string; description?: string } = {};
+        if (deckTitle.trim() !== (props.initialDeck?.deckTitle ?? '')) {
+          updateFields.name = deckTitle.trim();
+        }
+        if (description.trim() !== (props.initialDeck?.description ?? '')) {
+          updateFields.description = description.trim();
+        }
+        if (
+          updateFields.name !== undefined ||
+          updateFields.description !== undefined
+        ) {
+          await fsrsClient.decks.update(apiDeckId, updateFields);
+        }
+
         const originalBackendIds = new Set(
           (props.initialFlashcards ?? [])
             .map((f) => f.backendId)

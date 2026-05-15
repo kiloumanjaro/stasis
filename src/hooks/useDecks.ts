@@ -90,5 +90,26 @@ export function useDecks() {
     []
   );
 
-  return { decks, isLoading, error, fetchDecks, deleteDeck, createDeck };
+  const updateDeck = useCallback(
+    async (deckId: number, fields: { name?: string; description?: string }) => {
+      const updated = await fsrsClient.decks.update(deckId, fields);
+      setRawDecks((prev) =>
+        prev.map((e) =>
+          e.deck.id === deckId ? { ...e, deck: { ...e.deck, ...updated } } : e
+        )
+      );
+      return updated;
+    },
+    []
+  );
+
+  return {
+    decks,
+    isLoading,
+    error,
+    fetchDecks,
+    deleteDeck,
+    createDeck,
+    updateDeck,
+  };
 }
