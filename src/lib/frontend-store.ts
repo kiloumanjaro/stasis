@@ -30,10 +30,13 @@ export interface SettingsProfile {
 }
 
 export interface OnboardingState {
-  focusGoalMinutes: number;
-  breakDurationMinutes: number;
-  dailyGoalCards: number;
-  cvMonitoringEnabled: boolean;
+  privacy_comfort: 'visible' | 'hidden' | 'off';
+  expression_tolerance: 'neutral' | 'intense' | 'variable';
+  study_block_length: number;
+  mini_breaks_per_session: number;
+  recovery_duration: number;
+  break_mechanic: 'relaxed' | 'accountable';
+  show_timer: boolean;
   completed: boolean;
   skipped: boolean;
 }
@@ -89,10 +92,13 @@ export const DEFAULT_SETTINGS_PROFILE: SettingsProfile = {
 };
 
 export const DEFAULT_ONBOARDING_STATE: OnboardingState = {
-  focusGoalMinutes: 25,
-  breakDurationMinutes: 5,
-  dailyGoalCards: 20,
-  cvMonitoringEnabled: false,
+  privacy_comfort: 'visible',
+  expression_tolerance: 'neutral',
+  study_block_length: 25,
+  mini_breaks_per_session: 2,
+  recovery_duration: 10,
+  break_mechanic: 'relaxed',
+  show_timer: true,
   completed: false,
   skipped: false,
 };
@@ -188,10 +194,9 @@ export function markOnboardingComplete() {
   });
 
   saveSettingsProfile({
-    focus_goal_minutes: onboarding.focusGoalMinutes,
-    break_duration_minutes: onboarding.breakDurationMinutes,
-    daily_goal_cards: onboarding.dailyGoalCards,
-    cv_monitoring_enabled: onboarding.cvMonitoringEnabled,
+    focus_goal_minutes: onboarding.study_block_length,
+    break_duration_minutes: onboarding.recovery_duration,
+    cv_monitoring_enabled: onboarding.privacy_comfort !== 'off',
   });
 
   return onboarding;

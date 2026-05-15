@@ -59,7 +59,7 @@ export default function WelcomePage() {
 
         <div className="flex w-full max-w-[320px] flex-col items-center gap-3">
           <Button
-            onClick={() => router.push('/onboarding/preferences')}
+            onClick={() => router.push('/onboarding/setup')}
             className="w-full"
           >
             Get Started
