@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { BREAK_LABELS, EXPRESSION_LABELS, PRIVACY_LABELS } from './constants';
 import type { SummaryPreferences } from './types';
+import { Card, CardContent } from '@/components/ui/card';
 
 interface StepSummaryProps {
   preferences: SummaryPreferences;
@@ -77,28 +78,33 @@ export function StepSummary({ preferences }: StepSummaryProps) {
         </div>
       </div>
 
-      <div className="rounded-xl border border-[#2A2A35] bg-[#131316] p-6">
-        <p className="mb-4 text-[11px] font-medium uppercase tracking-widest text-[#5A5A72]">
-          Configuration
-        </p>
-        <div className="space-y-3">
-          {rows.map((row) => (
-            <div key={row.label} className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-[13px] text-[#9090A8]">
-                {row.icon}
-                {row.label}
-              </div>
-              <span
-                className={`text-[13px] font-medium ${
-                  row.accent === false ? 'text-[#5A5A72]' : 'text-[#EAEAF0]'
-                }`}
+      <Card className="border-[#2A2A35] bg-[#131316]">
+        <CardContent className="p-6">
+          <p className="mb-4 text-[11px] font-medium uppercase tracking-widest text-[#5A5A72]">
+            Configuration
+          </p>
+          <div className="space-y-3">
+            {rows.map((row) => (
+              <div
+                key={row.label}
+                className="flex items-center justify-between"
               >
-                {row.value}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
+                <div className="flex items-center gap-2 text-[13px] text-[#9090A8]">
+                  {row.icon}
+                  {row.label}
+                </div>
+                <span
+                  className={`text-[13px] font-medium ${
+                    row.accent === false ? 'text-[#5A5A72]' : 'text-[#EAEAF0]'
+                  }`}
+                >
+                  {row.value}
+                </span>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </>
   );
 }

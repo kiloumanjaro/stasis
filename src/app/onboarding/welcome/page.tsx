@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { BookOpen, Timer, Smile } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { useState } from 'react';
 import { markOnboardingComplete } from '@/lib/frontend-store';
 
@@ -41,15 +42,14 @@ export default function WelcomePage() {
 
         <div className="flex flex-wrap items-center justify-center gap-2">
           {FEATURES.map(({ icon: Icon, label }) => (
-            <div
+            <Badge
               key={label}
-              className="flex items-center gap-1.5 rounded-full border border-[#2A2A35] bg-[#131316] px-3.5 py-1.5"
+              variant="outline"
+              className="flex items-center gap-1.5 rounded-full border-[#2A2A35] bg-[#131316] px-3.5 py-1.5 text-[#9090A8]"
             >
-              <Icon className="h-3.5 w-3.5 text-[#9090A8]" />
-              <span className="text-[13px] font-medium text-[#9090A8]">
-                {label}
-              </span>
-            </div>
+              <Icon className="h-3.5 w-3.5" />
+              <span className="text-[13px] font-medium">{label}</span>
+            </Badge>
           ))}
         </div>
 

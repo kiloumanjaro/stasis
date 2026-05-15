@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import {
   markOnboardingComplete,
   type OnboardingState,
@@ -121,12 +122,7 @@ export default function OnboardingSetupPage() {
     <div className="flex min-h-screen items-center justify-center">
       <div className="w-full max-w-[520px] space-y-8 px-6">
         <div className="flex items-center gap-4">
-          <div className="h-0.5 flex-1 rounded-full bg-[#1E1E26]">
-            <div
-              className="h-full rounded-full bg-[#7C6FF7] transition-[width] duration-300"
-              style={{ width: `${progressFraction * 100}%` }}
-            />
-          </div>
+          <Progress value={progressFraction * 100} className="h-0.5 flex-1" />
           <span className="shrink-0 text-xs text-[#5A5A72]">
             {isSummary ? 'Summary' : `${currentStep} of ${TOTAL_STEPS}`}
           </span>
