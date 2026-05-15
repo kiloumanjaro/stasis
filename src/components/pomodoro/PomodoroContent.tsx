@@ -52,7 +52,9 @@ export function PomodoroContent({
   );
   const [shellLeftInset, setShellLeftInset] = useState(0);
   const [timerInitialX, setTimerInitialX] = useState(0);
+  const [timerInitialY, setTimerInitialY] = useState(480);
   const [monitorInitialX, setMonitorInitialX] = useState(0);
+  const [monitorInitialY] = useState(80);
 
   // Payload for editing an existing deck
   const [editPayload, setEditPayload] = useState<{
@@ -103,19 +105,24 @@ export function PomodoroContent({
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
+    const monitorHeight = 400;
+    const verticalGap = 20;
+
     const syncWidgetPositions = () => {
       const { left } = getAppShellViewportInsets();
       setShellLeftInset(left);
+
+      // Stack Monitor and Timer vertically on the right side
+      setMonitorInitialX(Math.max(left + 20, window.innerWidth - 380));
       setTimerInitialX(Math.max(left + 20, window.innerWidth - 360));
-      // Position monitor to the left of timer
-      setMonitorInitialX(Math.max(left + 20, window.innerWidth - 720));
+      setTimerInitialY(monitorInitialY + monitorHeight + verticalGap);
     };
 
     syncWidgetPositions();
     window.addEventListener('resize', syncWidgetPositions);
 
     return () => window.removeEventListener('resize', syncWidgetPositions);
-  }, []);
+  }, [monitorInitialY]);
 
   const camera = useCameraContextSafe();
   const isCameraActive = camera?.isCameraActive ?? false;
@@ -204,44 +211,44 @@ export function PomodoroContent({
         </svg>
       </button>
 
-      {/* Floating Camera Widget - anchors left */}
+      {/* Floating Camera Widget - anchors top-left, above deck area */}
       <DraggableWidget
         isOpen={widgets.camera.isOpen}
         onMinimize={() => minimizeWidget('camera')}
         onFocus={() => focusWidget('camera')}
-        initialPosition={{ x: shellLeftInset + 20, y: 100 }}
+        initialPosition={{ x: shellLeftInset + 20, y: 80 }}
         title="Camera"
         zIndex={getZIndex('camera')}
-        width={320}
-        minHeight={280}
+        width={280}
+        minHeight={220}
       >
         <CameraWidget />
       </DraggableWidget>
 
-      {/* Floating Timer Widget - anchors right */}
+      {/* Floating Timer Widget - right side, below Focus Monitor */}
       <DraggableWidget
         isOpen={widgets.timer.isOpen}
         onMinimize={() => minimizeWidget('timer')}
         onFocus={() => focusWidget('timer')}
-        initialPosition={{ x: timerInitialX || 800, y: 100 }}
+        initialPosition={{ x: timerInitialX || 800, y: timerInitialY }}
         title="Pomodoro Timer"
         zIndex={getZIndex('timer')}
         width={320}
-        minHeight={520}
+        minHeight={460}
       >
         <TimerWidget initialSettings={initialTimerSettings} />
       </DraggableWidget>
 
-      {/* Floating CV Monitor Widget - positioned left of timer */}
+      {/* Floating CV Monitor Widget - right side, above timer */}
       <DraggableWidget
         isOpen={widgets.monitor.isOpen}
         onMinimize={() => minimizeWidget('monitor')}
         onFocus={() => focusWidget('monitor')}
-        initialPosition={{ x: monitorInitialX || 440, y: 100 }}
+        initialPosition={{ x: monitorInitialX || 440, y: monitorInitialY }}
         title="Focus Monitor"
         zIndex={getZIndex('monitor')}
         width={340}
-        minHeight={400}
+        minHeight={380}
       >
         <CVMonitor />
       </DraggableWidget>

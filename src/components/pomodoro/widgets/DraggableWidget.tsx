@@ -51,7 +51,7 @@ export function DraggableWidget({
   return (
     <Card
       className={cn(
-        'fixed border-border/50 bg-card/95 shadow-xl backdrop-blur-sm',
+        'fixed rounded-xl border-border/50 bg-card/95 shadow-lg backdrop-blur-sm',
         isDragging && 'cursor-grabbing',
         className
       )}
