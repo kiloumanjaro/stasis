@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Icon } from '@iconify/react';
 
@@ -202,7 +203,8 @@ export function StudyActivityHeatmap({
   );
 }
 
-export function DashboardContent() {
+export async function DashboardContent() {
+  await cookies();
   const activityData: Record<string, number> = {};
   const displayMonth = getDisplayMonth(activityData);
   const monthLabel = new Intl.DateTimeFormat('en-US', {

@@ -4,14 +4,16 @@
 
 import { Sidebar } from '@/components/app/Sidebar';
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { getBackendUser, type BackendAuthUser } from '@/lib/backend-auth';
-import { readOnboardingState } from '@/lib/frontend-store';
+import { getBackendOnboardingStatus } from '@/lib/backend-onboarding';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<BackendAuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     let isMounted = true;
@@ -31,11 +33,27 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        const onboarding = readOnboardingState();
+        const onboarding = await getBackendOnboardingStatus();
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (!onboarding) {
+          setUser(null);
+          setLoading(false);
+          router.replace('/auth/sign-up');
+          return;
+        }
+
         if (!onboarding.completed) {
           setUser(currentUser);
           setLoading(false);
-          router.replace('/onboarding/welcome');
+          const query = searchParams.toString();
+          const next = query ? `${pathname}?${query}` : pathname;
+          router.replace(
+            `/onboarding/welcome?next=${encodeURIComponent(next)}`
+          );
           return;
         }
 
@@ -58,7 +76,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return () => {
       isMounted = false;
     };
-  }, [router]);
+  }, [pathname, router, searchParams]);
 
   if (loading) {
     return (

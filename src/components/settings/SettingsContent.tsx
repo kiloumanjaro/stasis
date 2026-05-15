@@ -14,7 +14,6 @@ import {
   clearFrontendAppState,
   DEFAULT_ONBOARDING_STATE,
   DEFAULT_SETTINGS_PROFILE,
-  readOnboardingState,
   readPreferenceSummary,
   readSettingsProfile,
   saveSettingsProfile,
@@ -305,7 +304,6 @@ export function SettingsContent() {
       const exportPayload = {
         exported_at: new Date().toISOString(),
         settings: readSettingsProfile(),
-        onboarding: readOnboardingState(),
         preferenceSummary: readPreferenceSummary(),
       };
 

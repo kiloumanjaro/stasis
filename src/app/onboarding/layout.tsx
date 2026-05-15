@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { readOnboardingState } from '@/lib/frontend-store';
+import { getBackendOnboardingStatus } from '@/lib/backend-onboarding';
 
 export default function OnboardingLayout({
   children,
@@ -12,10 +12,30 @@ export default function OnboardingLayout({
   const router = useRouter();
 
   useEffect(() => {
-    const onboarding = readOnboardingState();
-    if (onboarding.completed) {
-      router.replace('/dashboard');
-    }
+    let isMounted = true;
+
+    const syncOnboardingState = async () => {
+      const onboarding = await getBackendOnboardingStatus();
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (!onboarding) {
+        router.replace('/auth/sign-up');
+        return;
+      }
+
+      if (onboarding.completed) {
+        router.replace('/dashboard');
+      }
+    };
+
+    void syncOnboardingState();
+
+    return () => {
+      isMounted = false;
+    };
   }, [router]);
 
   return <div className="min-h-screen bg-[#0f0f0f]">{children}</div>;

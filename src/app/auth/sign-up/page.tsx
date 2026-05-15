@@ -1,10 +1,14 @@
+import { Suspense } from 'react';
+
 import SignInWithGoogleButton from '@/components/get-started-button';
 import SignupHeroEffects from '@/components/signup/SignupHeroEffects';
 
 export default function LoginPage() {
   return (
     <main className="min-h-screen bg-[#0f0f0f]">
-      <SignupHeroEffects />
+      <Suspense fallback={null}>
+        <SignupHeroEffects />
+      </Suspense>
       <div>
         <div className="relative z-10 mt-24 flex w-5/12 flex-col items-center justify-center">
           <div className="flex flex-row">
@@ -16,7 +20,9 @@ export default function LoginPage() {
           </div>
 
           <div className="p-6 text-center">
-            <SignInWithGoogleButton />
+            <Suspense fallback={null}>
+              <SignInWithGoogleButton />
+            </Suspense>
           </div>
         </div>
         <div className="h-full bg-red-500"></div>

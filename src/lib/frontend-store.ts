@@ -75,7 +75,6 @@ interface FlashcardStore {
 }
 
 const SETTINGS_STORAGE_KEY = 'stasis-settings-profile';
-const ONBOARDING_STORAGE_KEY = 'stasis-onboarding';
 const PREFERENCE_SUMMARY_STORAGE_KEY = 'stasis-preference-summary';
 const FLASHCARD_STORAGE_KEY = 'stasis-flashcards';
 
@@ -183,45 +182,6 @@ function getDefaultFlashcardStore(): FlashcardStore {
     decks: [],
     cardStates: {},
   };
-}
-
-export function readOnboardingState(): OnboardingState {
-  return {
-    ...DEFAULT_ONBOARDING_STATE,
-    ...readJson<Partial<OnboardingState>>(ONBOARDING_STORAGE_KEY, {}),
-  };
-}
-
-export function saveOnboardingState(patch: Partial<OnboardingState>) {
-  const nextState = {
-    ...readOnboardingState(),
-    ...patch,
-  };
-
-  writeJson(ONBOARDING_STORAGE_KEY, nextState);
-  return nextState;
-}
-
-export function markOnboardingComplete(patch: Partial<OnboardingState> = {}) {
-  const onboarding = saveOnboardingState({
-    ...patch,
-    completed: true,
-  });
-
-  saveSettingsProfile({
-    privacy_comfort: onboarding.privacy_comfort,
-    expression_tolerance: onboarding.expression_tolerance,
-    study_block_length: onboarding.study_block_length,
-    mini_breaks_per_session: onboarding.mini_breaks_per_session,
-    recovery_duration: onboarding.recovery_duration,
-    break_mechanic: onboarding.break_mechanic,
-    show_timer: onboarding.show_timer,
-    focus_goal_minutes: onboarding.study_block_length,
-    break_duration_minutes: onboarding.recovery_duration,
-    cv_monitoring_enabled: onboarding.privacy_comfort !== 'off',
-  });
-
-  return onboarding;
 }
 
 export function readSettingsProfile(): SettingsProfile {
@@ -429,7 +389,6 @@ export function clearFrontendAppState() {
 
   [
     SETTINGS_STORAGE_KEY,
-    ONBOARDING_STORAGE_KEY,
     PREFERENCE_SUMMARY_STORAGE_KEY,
     FLASHCARD_STORAGE_KEY,
   ].forEach((storageKey) => {

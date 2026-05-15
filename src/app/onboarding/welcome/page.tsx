@@ -1,12 +1,12 @@
 'use client';
 
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { BookOpen, Timer, Smile } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useState } from 'react';
-import { markOnboardingComplete } from '@/lib/frontend-store';
+import { completeBackendOnboarding } from '@/lib/backend-onboarding';
 
 const FEATURES = [
   { icon: BookOpen, label: 'AI Flashcards' },
@@ -16,12 +16,24 @@ const FEATURES = [
 
 export default function WelcomePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [skipping, setSkipping] = useState(false);
 
   const handleSkip = async () => {
     setSkipping(true);
-    markOnboardingComplete({ skipped: true });
-    router.push('/dashboard');
+
+    try {
+      const onboarding = await completeBackendOnboarding();
+
+      if (!onboarding?.completed) {
+        throw new Error('Onboarding skip was not confirmed');
+      }
+
+      router.push(searchParams.get('next') ?? '/dashboard');
+    } catch (error) {
+      console.error('Error skipping onboarding:', error);
+      setSkipping(false);
+    }
   };
 
   return (
@@ -55,7 +67,14 @@ export default function WelcomePage() {
 
         <div className="flex w-full max-w-[320px] flex-col items-center gap-3">
           <Button
-            onClick={() => router.push('/onboarding/setup')}
+            onClick={() => {
+              const next = searchParams.get('next');
+              router.push(
+                next
+                  ? `/onboarding/setup?next=${encodeURIComponent(next)}`
+                  : '/onboarding/setup'
+              );
+            }}
             className="w-full"
           >
             Get Started

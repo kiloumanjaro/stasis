@@ -1,14 +1,15 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import {
-  markOnboardingComplete,
-  type OnboardingState,
-} from '@/lib/frontend-store';
+  completeBackendOnboarding,
+  getBackendOnboardingStatus,
+} from '@/lib/backend-onboarding';
+import { saveSettingsProfile } from '@/lib/frontend-store';
 import { STEP_META } from '@/components/onboarding/setup/constants';
 import { StepBreakMechanic } from '@/components/onboarding/setup/StepBreakMechanic';
 import { StepExpression } from '@/components/onboarding/setup/StepExpression';
@@ -26,6 +27,7 @@ import {
 
 export default function OnboardingSetupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [currentStep, setCurrentStep] = useState(1);
   const [completing, setCompleting] = useState(false);
 
@@ -76,7 +78,7 @@ export default function OnboardingSetupPage() {
     showTimer,
   ]);
 
-  const buildPreferences = useCallback((): Partial<OnboardingState> => {
+  const buildPreferences = useCallback(() => {
     return {
       privacy_comfort: privacyComfort ?? 'visible',
       expression_tolerance: expressionTolerance ?? 'neutral',
@@ -98,13 +100,19 @@ export default function OnboardingSetupPage() {
   ]);
 
   const goBack = useCallback(() => {
+    const next = searchParams.get('next');
+
     if (currentStep === 1) {
-      router.push('/onboarding/welcome');
+      router.push(
+        next
+          ? `/onboarding/welcome?next=${encodeURIComponent(next)}`
+          : '/onboarding/welcome'
+      );
       return;
     }
 
     setCurrentStep((step) => step - 1);
-  }, [currentStep, router]);
+  }, [currentStep, router, searchParams]);
 
   const goForward = useCallback(() => {
     if (currentStep <= TOTAL_STEPS) {
@@ -112,11 +120,51 @@ export default function OnboardingSetupPage() {
     }
   }, [currentStep]);
 
-  const handleComplete = useCallback(() => {
+  const handleComplete = useCallback(async () => {
     setCompleting(true);
-    markOnboardingComplete(buildPreferences());
-    router.push('/dashboard');
-  }, [buildPreferences, router]);
+
+    try {
+      saveSettingsProfile({
+        ...buildPreferences(),
+        focus_goal_minutes: studyBlockLength,
+        break_duration_minutes: recoveryDuration,
+        cv_monitoring_enabled: (privacyComfort ?? 'visible') !== 'off',
+      });
+
+      const onboarding = await completeBackendOnboarding();
+
+      if (!onboarding?.completed) {
+        throw new Error('Onboarding completion was not confirmed');
+      }
+
+      const next = searchParams.get('next') ?? '/dashboard';
+      router.push(next);
+    } catch (error) {
+      console.error('Error completing onboarding:', error);
+
+      const onboarding = await getBackendOnboardingStatus();
+
+      if (!onboarding) {
+        router.replace('/auth/sign-up');
+        return;
+      }
+
+      if (onboarding.completed) {
+        const next = searchParams.get('next') ?? '/dashboard';
+        router.push(next);
+        return;
+      }
+
+      setCompleting(false);
+    }
+  }, [
+    buildPreferences,
+    privacyComfort,
+    recoveryDuration,
+    router,
+    searchParams,
+    studyBlockLength,
+  ]);
 
   return (
     <div className="flex min-h-screen items-center justify-center">
