@@ -464,6 +464,10 @@ export function SettingsContent() {
             />
             <Label htmlFor="cvMonitoring">Enable webcam monitoring</Label>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Video stays local in your browser. When monitoring is enabled,
+            mapped emotion labels may be synced during active focus sessions.
+          </p>
 
           {showCameraPreview && (
             <div className="space-y-2">
@@ -477,7 +481,8 @@ export function SettingsContent() {
               />
               <p className="text-xs text-muted-foreground">
                 {cameraStatus === 'requesting' && 'Requesting camera access...'}
-                {cameraStatus === 'active' && 'Camera connected.'}
+                {cameraStatus === 'active' &&
+                  'Camera connected. Video stays local; only mapped emotion labels may sync during focus sessions.'}
                 {cameraStatus === 'blocked' &&
                   'Camera access blocked. Check browser permission settings.'}
               </p>

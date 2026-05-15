@@ -103,7 +103,7 @@ export function CVDataDisplay({ data, className }: CVDataDisplayProps) {
         <EyeOff className="mb-2 h-8 w-8 opacity-50" />
         <p className="text-sm">Waiting for analysis data...</p>
         <p className="mt-1 text-xs opacity-70">
-          Start your camera to begin monitoring
+          Start your camera and a focus session to begin monitoring
         </p>
       </div>
     );
