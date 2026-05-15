@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCameraContextSafe } from '@/features/camera/context/CameraContext';
+import { useCVContextSafe } from '@/features/camera/context/CVContext';
+import type { StopRecordingReason } from '@/features/camera/types';
 
 type TimerMode = 'focus' | 'shortBreak' | 'longBreak';
 
@@ -49,16 +51,33 @@ let persistedState: {
 } | null = null;
 
 export function TimerWidget({ initialSettings }: TimerWidgetProps) {
+  const initialFocusDuration = initialSettings?.focusDuration;
+  const initialShortBreakDuration = initialSettings?.shortBreakDuration;
+  const initialLongBreakDuration = initialSettings?.longBreakDuration;
+  const initialSessionsBeforeLongBreak =
+    initialSettings?.sessionsBeforeLongBreak;
+
   const resolvedInitialSettings = useMemo(
     () => ({
       ...DEFAULT_SETTINGS,
-      ...initialSettings,
+      ...(initialFocusDuration !== undefined
+        ? { focusDuration: initialFocusDuration }
+        : {}),
+      ...(initialShortBreakDuration !== undefined
+        ? { shortBreakDuration: initialShortBreakDuration }
+        : {}),
+      ...(initialLongBreakDuration !== undefined
+        ? { longBreakDuration: initialLongBreakDuration }
+        : {}),
+      ...(initialSessionsBeforeLongBreak !== undefined
+        ? { sessionsBeforeLongBreak: initialSessionsBeforeLongBreak }
+        : {}),
     }),
     [
-      initialSettings?.focusDuration,
-      initialSettings?.shortBreakDuration,
-      initialSettings?.longBreakDuration,
-      initialSettings?.sessionsBeforeLongBreak,
+      initialFocusDuration,
+      initialLongBreakDuration,
+      initialSessionsBeforeLongBreak,
+      initialShortBreakDuration,
     ]
   );
 
@@ -130,6 +149,12 @@ export function TimerWidget({ initialSettings }: TimerWidgetProps) {
   const camera = useCameraContextSafe();
   const cameraRef = useRef(camera);
   cameraRef.current = camera;
+  const cv = useCVContextSafe();
+  const cvRef = useRef(cv);
+  cvRef.current = cv;
+  const stopReasonRef = useRef<StopRecordingReason>('pause');
+  const shouldRecord = isRunning && mode === 'focus';
+  const previousShouldRecordRef = useRef(false);
 
   useEffect(() => {
     cameraRef.current?.setSessionActive(isRunning && mode === 'focus');
@@ -140,6 +165,26 @@ export function TimerWidget({ initialSettings }: TimerWidgetProps) {
       cameraRef.current?.setSessionActive(false);
     };
   }, []);
+
+  useEffect(() => {
+    const previousShouldRecord = previousShouldRecordRef.current;
+
+    if (previousShouldRecord === shouldRecord) {
+      return;
+    }
+
+    previousShouldRecordRef.current = shouldRecord;
+
+    if (shouldRecord) {
+      stopReasonRef.current = 'pause';
+      void cvRef.current?.startRecordingSession();
+      return;
+    }
+
+    const stopReason = stopReasonRef.current;
+    stopReasonRef.current = 'pause';
+    void cvRef.current?.stopRecordingSession(stopReason);
+  }, [shouldRecord]);
 
   // Persist state to module-level variable
   useEffect(() => {
@@ -235,6 +280,7 @@ export function TimerWidget({ initialSettings }: TimerWidgetProps) {
 
   // Handle timer completion
   const handleTimerComplete = useCallback(() => {
+    stopReasonRef.current = mode === 'focus' ? 'complete' : 'break';
     setIsRunning(false);
     setEndTime(null);
 
@@ -308,6 +354,7 @@ export function TimerWidget({ initialSettings }: TimerWidgetProps) {
   };
 
   const handlePause = () => {
+    stopReasonRef.current = 'pause';
     // Store the remaining time when pausing
     if (endTime) {
       const remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
@@ -319,6 +366,7 @@ export function TimerWidget({ initialSettings }: TimerWidgetProps) {
   };
 
   const handleReset = () => {
+    stopReasonRef.current = 'reset';
     setIsRunning(false);
     setEndTime(null);
     const duration = getDurationForMode(mode);

@@ -290,18 +290,50 @@ export function useFaceApiCV(
    */
   useEffect(() => {
     const video = videoRef?.current;
-    const shouldRun =
-      isModelLoaded &&
-      video &&
-      video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA;
-
-    if (shouldRun && detectionLoopRef.current === null) {
-      startDetectionLoop();
-    } else if (!shouldRun && detectionLoopRef.current !== null) {
+    if (!video) {
       stopDetectionLoop();
+      return;
     }
 
+    const syncLoopState = () => {
+      const shouldRun =
+        isModelLoaded && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA;
+
+      if (shouldRun && detectionLoopRef.current === null) {
+        startDetectionLoop();
+      } else if (!shouldRun && detectionLoopRef.current !== null) {
+        stopDetectionLoop();
+      }
+    };
+
+    syncLoopState();
+
+    const handleLoaded = () => syncLoopState();
+    const handleStopped = () => stopDetectionLoop();
+
+    video.addEventListener('loadeddata', handleLoaded);
+    video.addEventListener('playing', handleLoaded);
+    video.addEventListener('canplay', handleLoaded);
+    video.addEventListener('pause', handleStopped);
+    video.addEventListener('emptied', handleStopped);
+    video.addEventListener('ended', handleStopped);
+
+    const tracks =
+      video.srcObject instanceof MediaStream ? video.srcObject.getTracks() : [];
+    tracks.forEach((track) => {
+      track.addEventListener('ended', handleStopped);
+    });
+
     return () => {
+      video.removeEventListener('loadeddata', handleLoaded);
+      video.removeEventListener('playing', handleLoaded);
+      video.removeEventListener('canplay', handleLoaded);
+      video.removeEventListener('pause', handleStopped);
+      video.removeEventListener('emptied', handleStopped);
+      video.removeEventListener('ended', handleStopped);
+      tracks.forEach((track) => {
+        track.removeEventListener('ended', handleStopped);
+      });
       stopDetectionLoop();
     };
   }, [isModelLoaded, videoRef, startDetectionLoop, stopDetectionLoop]);

@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { Focus, HelpCircle, Minus, Eye } from 'lucide-react';
+import { Focus, HelpCircle, Minus, Eye, EyeOff } from 'lucide-react';
 import type { CVResponse } from '../types';
 
 interface CVDataDisplayProps {
@@ -60,12 +60,14 @@ export function CVDataDisplay({ data, className }: CVDataDisplayProps) {
     return (
       <div
         className={cn(
-          'flex items-center justify-center rounded-lg bg-muted/50 px-3 py-4',
+          'flex flex-col items-center justify-center rounded-lg bg-muted/50 px-3 py-4 text-center',
           className
         )}
       >
-        <p className="text-xs text-muted-foreground">
-          Waiting for analysis data...
+        <EyeOff className="mb-2 h-8 w-8 opacity-50" />
+        <p className="text-sm">Waiting for analysis data...</p>
+        <p className="mt-1 text-xs opacity-70">
+          Start your camera and a focus session to begin monitoring
         </p>
       </div>
     );
