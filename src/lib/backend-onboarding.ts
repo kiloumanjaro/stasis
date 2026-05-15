@@ -1,4 +1,4 @@
-import { getBackendBaseUrl, getBackendLogoutToken } from '@/lib/backend-auth';
+import { getBackendBaseUrl } from '@/lib/backend-auth';
 
 interface OnboardingStatusResponse {
   completed?: boolean;
@@ -31,24 +31,10 @@ export async function getBackendOnboardingStatus() {
 }
 
 export async function completeBackendOnboarding() {
-  const headers = new Headers();
-
-  try {
-    const csrfToken = await getBackendLogoutToken();
-    headers.set('x-csrf-token', csrfToken);
-  } catch {
-    // Some environments may not require CSRF for this endpoint.
-  }
-
-  const response = await fetch(
-    `${getBackendBaseUrl()}/api/onboarding/complete`,
-    {
-      method: 'POST',
-      cache: 'no-store',
-      credentials: 'include',
-      headers,
-    }
-  );
+  const response = await fetch('/api/onboarding/complete', {
+    method: 'POST',
+    cache: 'no-store',
+  });
 
   if (response.status === 401) {
     return null;
