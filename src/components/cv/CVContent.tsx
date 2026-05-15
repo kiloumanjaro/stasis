@@ -5,13 +5,13 @@ import * as faceapi from 'face-api.js';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { Slider } from '@/components/ui/slider';
 import { Footer } from '@/components/dashboard/Footer';
 import {
   Camera,
   CameraOff,
   Loader2,
   Video,
+  VideoOff,
   BarChart3,
   ShieldCheck,
   AlertTriangle,
@@ -22,6 +22,9 @@ import {
   ChevronUp,
   Clock,
   Activity,
+  Meh,
+  Frown,
+  Shuffle,
 } from 'lucide-react';
 import {
   readSettingsProfile,
@@ -31,6 +34,7 @@ import {
   type EmotionSessionRecord,
   type EmotionSessionEntry,
   type PrivacyComfort,
+  type ExpressionTolerance,
 } from '@/lib/frontend-store';
 
 // ---------------------------------------------------------------------------
@@ -108,7 +112,8 @@ export function CVContent() {
 
   const [privacyComfort, setPrivacyComfort] =
     useState<PrivacyComfort>('visible');
-  const [expressionTolerance, setExpressionTolerance] = useState(0.5);
+  const [expressionTolerance, setExpressionTolerance] =
+    useState<ExpressionTolerance>('neutral');
   const [pastSessions, setPastSessions] = useState<EmotionSessionRecord[]>([]);
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(
     null
@@ -123,7 +128,7 @@ export function CVContent() {
   useEffect(() => {
     const settings = readSettingsProfile();
     setPrivacyComfort(settings.privacy_comfort ?? 'visible');
-    setExpressionTolerance(settings.expression_tolerance ?? 0.5);
+    setExpressionTolerance(settings.expression_tolerance ?? 'neutral');
     setPastSessions(readEmotionHistory());
   }, []);
 
@@ -309,7 +314,20 @@ export function CVContent() {
         const samples = recalibrationDataRef.current;
         if (samples.length > 0) {
           const avg = samples.reduce((a, b) => a + b, 0) / samples.length;
-          const newTolerance = Math.max(0.1, Math.min(0.9, avg));
+          // Variance — high variance = variable expression
+          const variance =
+            samples.reduce((acc, s) => acc + (s - avg) ** 2, 0) /
+            samples.length;
+          let newTolerance: ExpressionTolerance;
+          if (variance > 0.05) {
+            newTolerance = 'variable';
+          } else if (avg > 0.55) {
+            // Model reads neutral easily — calm focus face
+            newTolerance = 'neutral';
+          } else {
+            // Avg neutral is low — user looks intense even at rest
+            newTolerance = 'intense';
+          }
           setExpressionTolerance(newTolerance);
           saveSettingsProfile({ expression_tolerance: newTolerance });
         }
@@ -546,6 +564,21 @@ export function CVContent() {
         </Alert>
       )}
 
+      {/* Privacy indicator for off mode */}
+      {privacyComfort === 'off' && (
+        <Alert className="border-red-700/30 bg-red-950/20">
+          <VideoOff className="h-4 w-4 text-red-400" />
+          <AlertTitle className="text-red-400">Camera disabled</AlertTitle>
+          <AlertDescription className="text-red-200/70">
+            Your privacy preference is set to{' '}
+            <span className="font-medium">off</span>. All computer vision
+            features are disabled in study mode. You can still test the model on
+            this page, but no detection runs during sessions. Change this in
+            Settings to re-enable.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Privacy disclaimer — prominent placement */}
       <Alert className="border-emerald-700/30 bg-emerald-950/20">
         <ShieldCheck className="h-4 w-4 text-emerald-500" />
@@ -687,32 +720,59 @@ export function CVContent() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Your current expression tolerance determines how sensitively the
-            model reads changes in your face. A higher value means the model
-            needs a more expressive face to register a shift away from neutral.
+            Expression tolerance shapes how the model interprets your face. Pick
+            the option that best matches your usual focused expression, or run
+            the 30-second recalibration to set it automatically.
           </p>
-          <div className="flex items-center gap-4">
-            <span className="w-20 text-xs text-muted-foreground">
-              Sensitive
-            </span>
-            <Slider
-              value={[expressionTolerance * 100]}
-              min={10}
-              max={90}
-              step={1}
-              onValueChange={(val) => {
-                const newVal = val[0] / 100;
-                setExpressionTolerance(newVal);
-                saveSettingsProfile({ expression_tolerance: newVal });
-              }}
-              className="flex-1"
-            />
-            <span className="w-20 text-right text-xs text-muted-foreground">
-              Relaxed
-            </span>
-          </div>
-          <div className="text-center text-xs text-muted-foreground">
-            Current: {(expressionTolerance * 100).toFixed(0)}%
+          <div className="grid gap-2 sm:grid-cols-3">
+            {(
+              [
+                {
+                  value: 'neutral' as const,
+                  icon: Meh,
+                  title: 'Neutral',
+                  description: 'Calm focus face',
+                },
+                {
+                  value: 'intense' as const,
+                  icon: Frown,
+                  title: 'Intense',
+                  description: 'Frequent frown / serious look',
+                },
+                {
+                  value: 'variable' as const,
+                  icon: Shuffle,
+                  title: 'Variable',
+                  description: 'No strong pattern',
+                },
+              ] as const
+            ).map((opt) => {
+              const Icon = opt.icon;
+              const selected = expressionTolerance === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    setExpressionTolerance(opt.value);
+                    saveSettingsProfile({ expression_tolerance: opt.value });
+                  }}
+                  className={`flex flex-col items-start gap-1.5 rounded-lg border p-3 text-left transition-colors ${
+                    selected
+                      ? 'border-emerald-600/60 bg-emerald-950/30'
+                      : 'border-[#4a4a46] bg-[#0f0f0f] hover:border-[#6a6a66]'
+                  }`}
+                >
+                  <Icon
+                    className={`h-4 w-4 ${selected ? 'text-emerald-400' : 'text-muted-foreground'}`}
+                  />
+                  <span className="text-sm font-medium">{opt.title}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {opt.description}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           {isRecalibrating ? (
@@ -949,20 +1009,28 @@ export function CVContent() {
       <section>
         <div className="grid gap-6 md:grid-cols-2">
           <div className="flex items-center gap-3 rounded-lg border border-[#4a4a46]/50 bg-[#191919] px-6 py-5">
-            {privacyComfort === 'visible' ? (
+            {privacyComfort === 'visible' && (
               <Eye className="h-5 w-5 shrink-0 text-muted-foreground" />
-            ) : (
+            )}
+            {privacyComfort === 'hidden' && (
               <EyeOff className="h-5 w-5 shrink-0 text-yellow-500" />
+            )}
+            {privacyComfort === 'off' && (
+              <VideoOff className="h-5 w-5 shrink-0 text-red-400" />
             )}
             <div>
               <p className="text-sm font-medium">
-                Camera mode:{' '}
-                {privacyComfort === 'visible' ? 'Visible' : 'Hidden'}
+                Camera mode: {privacyComfort === 'visible' && 'Visible'}
+                {privacyComfort === 'hidden' && 'Hidden'}
+                {privacyComfort === 'off' && 'Off'}
               </p>
               <p className="text-xs text-muted-foreground">
-                {privacyComfort === 'visible'
-                  ? 'You see the camera feed during sessions.'
-                  : 'Detection runs silently in the background during sessions.'}
+                {privacyComfort === 'visible' &&
+                  'You see the camera feed during sessions.'}
+                {privacyComfort === 'hidden' &&
+                  'Detection runs silently in the background during sessions.'}
+                {privacyComfort === 'off' &&
+                  'Camera is disabled during sessions. No detection runs.'}
               </p>
             </div>
           </div>
