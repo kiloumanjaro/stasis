@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
-import { getBackendUser } from '@/lib/backend-auth';
+import { getBackendBaseUrl, getBackendUser } from '@/lib/backend-auth';
 
 function serializeCookieHeader(
   entries: Array<{ name: string; value: string }>
@@ -8,22 +8,53 @@ function serializeCookieHeader(
   return entries.map(({ name, value }) => `${name}=${value}`).join('; ');
 }
 
-export async function middleware(request: NextRequest) {
-  const response = NextResponse.next({
-    request,
-  });
+function replaceCookieValue(
+  cookieHeader: string,
+  name: string,
+  value: string
+): string {
+  const parts = cookieHeader
+    .split('; ')
+    .filter((c) => !c.startsWith(`${name}=`));
+  parts.push(`${name}=${value}`);
+  return parts.join('; ');
+}
 
-  // Skip auth check for callback and auth pages
+function extractSetCookieHeaders(headers: Headers): string[] {
+  const h = headers as Headers & { getSetCookie?: () => string[] };
+  return typeof h.getSetCookie === 'function'
+    ? h.getSetCookie()
+    : headers.get('set-cookie')
+      ? [headers.get('set-cookie')!]
+      : [];
+}
+
+async function refreshAccessToken(
+  cookieHeader: string
+): Promise<Response | null> {
+  try {
+    const response = await fetch(`${getBackendBaseUrl()}/auth/google/refresh`, {
+      method: 'POST',
+      headers: { Cookie: cookieHeader },
+      cache: 'no-store',
+    });
+    return response.ok ? response : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function middleware(request: NextRequest) {
+  const response = NextResponse.next({ request });
+
   if (request.nextUrl.pathname.startsWith('/auth/')) {
     return response;
   }
 
-  // Handle root path redirect
   if (request.nextUrl.pathname === '/') {
-    return response; // Let client-side handle it
+    return response;
   }
 
-  // Protected routes (require authentication)
   const protectedPaths = [
     '/dashboard',
     '/upload',
@@ -37,20 +68,55 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith(path)
   );
 
-  if (isProtectedPath) {
-    const cookieHeader = serializeCookieHeader(request.cookies.getAll());
-    const user = await getBackendUser(cookieHeader);
+  if (!isProtectedPath) {
+    return response;
+  }
 
-    if (!user) {
-      const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = '/auth/sign-up';
-      redirectUrl.search = '';
-      redirectUrl.searchParams.set(
-        'next',
-        `${request.nextUrl.pathname}${request.nextUrl.search}`
+  const cookieHeader = serializeCookieHeader(request.cookies.getAll());
+  let user = await getBackendUser(cookieHeader);
+
+  if (!user && request.cookies.get('refresh_token')) {
+    const refreshResponse = await refreshAccessToken(cookieHeader);
+
+    if (refreshResponse) {
+      const setCookieHeaders = extractSetCookieHeaders(refreshResponse.headers);
+
+      // Load Set-Cookie headers into a temp response so we can read by cookie name
+      const tempResponse = new NextResponse();
+      setCookieHeaders.forEach((h) =>
+        tempResponse.headers.append('Set-Cookie', h)
       );
-      return NextResponse.redirect(redirectUrl);
+      const newAccessToken = tempResponse.cookies.get('access_token')?.value;
+
+      if (newAccessToken) {
+        const updatedCookieHeader = replaceCookieValue(
+          cookieHeader,
+          'access_token',
+          newAccessToken
+        );
+        user = await getBackendUser(updatedCookieHeader);
+
+        if (user) {
+          const nextResponse = NextResponse.next({ request });
+          // Forward raw Set-Cookie headers to the browser as-is (no re-parsing needed)
+          setCookieHeaders.forEach((h) =>
+            nextResponse.headers.append('Set-Cookie', h)
+          );
+          return nextResponse;
+        }
+      }
     }
+  }
+
+  if (!user) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = '/auth/sign-up';
+    redirectUrl.search = '';
+    redirectUrl.searchParams.set(
+      'next',
+      `${request.nextUrl.pathname}${request.nextUrl.search}`
+    );
+    return NextResponse.redirect(redirectUrl);
   }
 
   return response;
