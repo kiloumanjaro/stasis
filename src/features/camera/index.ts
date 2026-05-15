@@ -3,7 +3,14 @@
  */
 
 // Types
-export type { CVResponse, ConnectionStatus, EmotionSnapshot } from './types';
+export type {
+  CVResponse,
+  ConnectionStatus,
+  EmotionRecordingState,
+  EmotionSnapshot,
+  EmotionTransportSnapshot,
+  StopRecordingReason,
+} from './types';
 
 // Hooks
 export { useFaceApiCV } from './hooks/useFaceApiCV';

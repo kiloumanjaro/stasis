@@ -125,7 +125,8 @@ export default function PermissionsPage() {
             Camera & Privacy
           </h1>
           <p className="text-sm text-[#9090A8]">
-            Choose how camera-based study support should behave.
+            Let Stasis analyze your webcam feed locally to improve your study
+            sessions.
           </p>
         </div>
 
@@ -182,7 +183,9 @@ export default function PermissionsPage() {
                 Break mechanic
               </p>
               <p className="mt-1 text-xs text-[#9090A8]">
-                Accountable breaks require an active camera.
+                No video ever leaves your device. When monitoring is enabled,
+                Stasis may sync mapped emotion labels to your account during
+                focus sessions. Accountable breaks require an active camera.
               </p>
             </div>
             <div className="inline-flex w-full overflow-hidden rounded-md border border-[#3A3A45] bg-[#1C1C22]">
