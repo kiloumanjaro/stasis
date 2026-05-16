@@ -1,3 +1,4 @@
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Icon } from '@iconify/react';
 
@@ -35,8 +36,7 @@ const stats = [
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 const HEATMAP_LEVEL_OPACITY = [0.08, 0.24, 0.42, 0.6, 0.82] as const;
-const HEATMAP_CELL_SIZE = 'clamp(1.2rem, 3.8vw, 2.125rem)';
-const HEATMAP_GAP = 'clamp(0.24rem, 1.2vw, 0.55rem)';
+const HEATMAP_GAP = '0.5rem';
 
 interface StudyActivityHeatmapProps {
   activityData: Record<string, number>;
@@ -147,17 +147,24 @@ export function StudyActivityHeatmap({
     current.setDate(current.getDate() + 1);
   }
 
-  const weekCount = days.length / 7;
-  const gridWidth = `calc((7 * ${HEATMAP_CELL_SIZE}) + (6 * ${HEATMAP_GAP}))`;
-
   return (
     <div className="w-full overflow-x-auto px-1 pb-1">
+      <style>{`
+        @media (max-width: 768px) {
+          .heatmap-grid { grid-template-columns: repeat(7, 1fr) !important; }
+          .heatmap-header { grid-template-columns: repeat(7, 1fr) !important; }
+          .heatmap-sun-cell { display: none !important; }
+          .heatmap-sun-header { display: none !important; }
+          .heatmap-cell { padding: 0.5rem !important; }
+        }
+        .heatmap-cell { aspect-ratio: 1 / 1 !important; }
+      `}</style>
       <div className="min-w-fit space-y-4 p-3 sm:p-5">
         <div
-          className="grid grid-cols-7 justify-items-center text-center text-[10px] uppercase tracking-[0.16em] text-muted-foreground"
+          className="heatmap-header grid text-center text-[10px] uppercase tracking-[0.16em] text-muted-foreground"
           style={{
+            gridTemplateColumns: 'repeat(8, 1fr)',
             columnGap: HEATMAP_GAP,
-            width: gridWidth,
           }}
         >
           {DAY_LABELS.map((day) => (
@@ -165,35 +172,43 @@ export function StudyActivityHeatmap({
               {day}
             </span>
           ))}
+          <span className="heatmap-sun-header text-center text-muted-foreground/50">
+            Sun
+          </span>
         </div>
 
         <div
-          className="grid grid-cols-7"
+          className="heatmap-grid grid"
           style={{
+            gridTemplateColumns: 'repeat(8, 1fr)',
             gap: HEATMAP_GAP,
-            width: gridWidth,
-            gridTemplateRows: `repeat(${weekCount}, minmax(0, 1fr))`,
           }}
         >
-          {days.map((day) => {
-            // Assumption: activity levels are normalized against the highest count in the visible month so all 4 active states can be used.
+          {days.map((day, idx) => {
             const level = getActivityLevel(day.count, maxCount);
             const opacity = HEATMAP_LEVEL_OPACITY[level];
 
             return (
-              <div key={day.key} className="flex justify-center">
+              <React.Fragment key={day.key}>
                 <div
+                  className="heatmap-cell rounded-[4px] border border-primary/10 p-3 transition-transform duration-150 hover:-translate-y-0.5"
                   aria-label={`${day.count} cards memorized on ${tooltipFormatter.format(day.date)}`}
-                  className="rounded-[4px] border border-primary/10 transition-transform duration-150 hover:-translate-y-0.5"
                   style={{
-                    width: HEATMAP_CELL_SIZE,
-                    height: HEATMAP_CELL_SIZE,
                     backgroundColor: `hsl(var(--primary) / ${opacity})`,
                     opacity: day.isCurrentMonth ? 1 : 0.45,
                   }}
                   title={`${day.count} cards memorized on ${tooltipFormatter.format(day.date)}`}
                 />
-              </div>
+                {(idx + 1) % 7 === 0 && (
+                  <div
+                    className="heatmap-sun-cell hidden rounded-[4px] border border-primary/10 p-3 sm:block"
+                    style={{
+                      backgroundColor: `hsl(var(--primary) / 0.08)`,
+                      opacity: 0.45,
+                    }}
+                  />
+                )}
+              </React.Fragment>
             );
           })}
         </div>
@@ -212,7 +227,7 @@ export function DashboardContent() {
 
   return (
     <div className="space-y-8">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {stats.map((stat) => (
           <Card
             key={stat.title}
@@ -235,7 +250,7 @@ export function DashboardContent() {
           </Card>
         ))}
 
-        <Card className="md:col-span-2 xl:col-span-1">
+        <Card className="col-span-2 md:col-span-2 xl:col-span-1">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium">{monthLabel}</CardTitle>
             <p className="text-xs text-muted-foreground">
@@ -247,7 +262,7 @@ export function DashboardContent() {
           </CardContent>
         </Card>
 
-        <Card className="border border-[#4a4a46] bg-[#30302e] transition-colors md:col-span-2 xl:col-span-2">
+        <Card className="col-span-2 border border-[#4a4a46] bg-[#30302e] transition-colors md:col-span-2 xl:col-span-2">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-white">
               Recent Activity

@@ -75,7 +75,7 @@ export default function SignupHeroEffects() {
           backgroundColor="transparent"
           wireframes={false}
           gravity={0.56}
-          fontSize="4rem"
+          fontSize="3rem"
           mouseConstraintStiffness={0.9}
         />
       ) : null}
