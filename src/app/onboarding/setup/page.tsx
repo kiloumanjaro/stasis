@@ -187,11 +187,10 @@ export default function OnboardingSetupPage() {
               <Button
                 onClick={goBack}
                 variant="ghost"
-                size="icon"
-                className="rounded-full border border-[#2A2A35]"
+                className="px-8"
                 aria-label="Back"
               >
-                <ChevronLeft className="h-5 w-5" />
+                Back
               </Button>
               <Button
                 onClick={goForward}
