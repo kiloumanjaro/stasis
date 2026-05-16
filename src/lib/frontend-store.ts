@@ -4,6 +4,7 @@ import {
   type Difficulty,
 } from '@/components/pomodoro/spacedRepetition';
 import type { AdaptiveStudyParameters } from '@/types/preferences';
+import { completeOnboarding, getOnboardingStatus } from '@/lib/onboarding';
 
 export type DefaultCardSort = 'due_date' | 'difficulty' | 'random';
 export type GazeSensitivity = 'low' | 'medium' | 'high';
@@ -202,11 +203,27 @@ export function saveOnboardingState(patch: Partial<OnboardingState>) {
   return nextState;
 }
 
-export function markOnboardingComplete(patch: Partial<OnboardingState> = {}) {
+export async function markOnboardingComplete(
+  patch: Partial<OnboardingState> = {}
+) {
   const onboarding = saveOnboardingState({
     ...patch,
     completed: true,
   });
+
+  try {
+    await completeOnboarding({
+      privacy_comfort: onboarding.privacy_comfort,
+      expression_tolerance: onboarding.expression_tolerance,
+      study_block_length: onboarding.study_block_length,
+      mini_breaks_per_session: onboarding.mini_breaks_per_session,
+      recovery_duration: onboarding.recovery_duration,
+      break_mechanic: onboarding.break_mechanic,
+      show_timer: onboarding.show_timer,
+    });
+  } catch (error) {
+    console.error('Failed to complete onboarding on backend:', error);
+  }
 
   saveSettingsProfile({
     privacy_comfort: onboarding.privacy_comfort,
@@ -222,6 +239,15 @@ export function markOnboardingComplete(patch: Partial<OnboardingState> = {}) {
   });
 
   return onboarding;
+}
+
+export async function checkOnboardingStatusWithBackend(): Promise<boolean> {
+  const status = await getOnboardingStatus();
+  if (status?.onboarding_completed) {
+    saveOnboardingState({ completed: true });
+    return true;
+  }
+  return false;
 }
 
 export function readSettingsProfile(): SettingsProfile {

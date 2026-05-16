@@ -112,10 +112,15 @@ export default function OnboardingSetupPage() {
     }
   }, [currentStep]);
 
-  const handleComplete = useCallback(() => {
+  const handleComplete = useCallback(async () => {
     setCompleting(true);
-    markOnboardingComplete(buildPreferences());
-    router.push('/dashboard');
+    try {
+      await markOnboardingComplete(buildPreferences());
+      router.push('/dashboard');
+    } catch (error) {
+      console.error('Error completing onboarding:', error);
+      setCompleting(false);
+    }
   }, [buildPreferences, router]);
 
   return (
