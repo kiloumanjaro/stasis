@@ -7,11 +7,8 @@ import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import {
   markOnboardingComplete,
-  saveRuntimePreferencesToLocalProfile,
   saveOnboardingState,
 } from '@/lib/frontend-store';
-import { completeRuntimeOnboarding } from '@/lib/preferences-client';
-import { DEFAULT_RUNTIME_PREFERENCES } from '@/types/runtime-preferences';
 
 const FEATURES = [
   { icon: BookOpen, label: 'AI Flashcards' },
@@ -25,30 +22,7 @@ export default function WelcomePage() {
 
   const handleSkip = async () => {
     setSkipping(true);
-    const skipPreferences = DEFAULT_RUNTIME_PREFERENCES;
-
-    saveOnboardingState({
-      skipped: true,
-      cvMonitoringEnabled: false,
-      privacyComfort: skipPreferences.privacy_comfort,
-      expressionTolerance: skipPreferences.expression_tolerance,
-      studyBlockLength: skipPreferences.study_block_length,
-      miniBreaksPerSession: skipPreferences.mini_breaks_per_session,
-      breakMechanic: skipPreferences.break_mechanic,
-      recoveryDuration: skipPreferences.recovery_duration,
-      showTimer: skipPreferences.show_timer,
-    });
-    saveRuntimePreferencesToLocalProfile(skipPreferences);
-
-    try {
-      const response = await completeRuntimeOnboarding(skipPreferences);
-      saveRuntimePreferencesToLocalProfile(response.preferences);
-    } catch {
-      console.warn(
-        'Skipped onboarding with local preferences until backend preferences are available.'
-      );
-    }
-
+    saveOnboardingState({ skipped: true });
     markOnboardingComplete();
     router.push('/dashboard');
   };

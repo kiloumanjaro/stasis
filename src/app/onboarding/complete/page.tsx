@@ -7,23 +7,13 @@ import { Button } from '@/components/ui/button';
 import {
   markOnboardingComplete,
   readOnboardingState,
-  runtimePreferencesFromOnboardingState,
-  saveRuntimePreferencesToLocalProfile,
 } from '@/lib/frontend-store';
-import { completeRuntimeOnboarding } from '@/lib/preferences-client';
-import type {
-  BreakMechanic,
-  PrivacyComfort,
-} from '@/types/runtime-preferences';
 
 interface ProfileSummary {
   focus_goal_minutes: number;
   break_duration_minutes: number;
   daily_goal_cards: number;
   cv_monitoring_enabled: boolean | null;
-  privacy_comfort: PrivacyComfort;
-  break_mechanic: BreakMechanic;
-  recovery_duration: number;
 }
 
 export default function CompletePage() {
@@ -38,29 +28,11 @@ export default function CompletePage() {
       break_duration_minutes: onboarding.breakDurationMinutes,
       daily_goal_cards: onboarding.dailyGoalCards,
       cv_monitoring_enabled: onboarding.cvMonitoringEnabled,
-      privacy_comfort: onboarding.privacyComfort,
-      break_mechanic: onboarding.breakMechanic,
-      recovery_duration: onboarding.recoveryDuration,
     });
   }, []);
 
   const handleComplete = async () => {
     setCompleting(true);
-    const onboarding = readOnboardingState();
-    const runtimePreferences =
-      runtimePreferencesFromOnboardingState(onboarding);
-
-    saveRuntimePreferencesToLocalProfile(runtimePreferences);
-
-    try {
-      const response = await completeRuntimeOnboarding(runtimePreferences);
-      saveRuntimePreferencesToLocalProfile(response.preferences);
-    } catch {
-      console.warn(
-        'Completed onboarding with local preferences until backend preferences are available.'
-      );
-    }
-
     markOnboardingComplete();
     router.push('/dashboard');
   };
@@ -125,7 +97,7 @@ export default function CompletePage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-[13px] text-[#9090A8]">
                   <Camera className="h-3.5 w-3.5" />
-                  Camera privacy
+                  CV monitoring
                 </div>
                 <span
                   className={`text-[13px] font-medium ${
@@ -134,25 +106,7 @@ export default function CompletePage() {
                       : 'text-[#5A5A72]'
                   }`}
                 >
-                  {profile.privacy_comfort}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-[13px] text-[#9090A8]">
-                  <Clock className="h-3.5 w-3.5" />
-                  Break style
-                </div>
-                <span className="text-[13px] font-medium text-[#EAEAF0]">
-                  {profile.break_mechanic}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-[13px] text-[#9090A8]">
-                  <Timer className="h-3.5 w-3.5" />
-                  Recovery window
-                </div>
-                <span className="text-[13px] font-medium text-[#EAEAF0]">
-                  {profile.recovery_duration} min
+                  {profile.cv_monitoring_enabled ? 'Enabled' : 'Disabled'}
                 </span>
               </div>
             </div>
