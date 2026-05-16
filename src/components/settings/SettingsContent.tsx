@@ -220,7 +220,6 @@ export function SettingsContent() {
   });
   const [isSaving, startSaving] = useTransition();
   const previousCameraChoicesRef = useRef({
-    emotion_detection: true,
     break_mechanic: 'relaxed' as BreakMechanic,
   });
 
@@ -268,7 +267,6 @@ export function SettingsContent() {
 
         if (loadedPreferences.privacy_comfort !== 'off') {
           previousCameraChoicesRef.current = {
-            emotion_detection: loadedPreferences.emotion_detection,
             break_mechanic: loadedPreferences.break_mechanic,
           };
         }
@@ -362,7 +360,6 @@ export function SettingsContent() {
         current.privacy_comfort !== 'off'
       ) {
         previousCameraChoicesRef.current = {
-          emotion_detection: current.emotion_detection,
           break_mechanic: current.break_mechanic,
         };
       }
@@ -372,8 +369,6 @@ export function SettingsContent() {
         patch.privacy_comfort !== 'off' &&
         current.privacy_comfort === 'off'
       ) {
-        next.emotion_detection =
-          previousCameraChoicesRef.current.emotion_detection;
         next.break_mechanic = previousCameraChoicesRef.current.break_mechanic;
       }
 
@@ -381,7 +376,6 @@ export function SettingsContent() {
 
       if (normalized.privacy_comfort !== 'off') {
         previousCameraChoicesRef.current = {
-          emotion_detection: normalized.emotion_detection,
           break_mechanic: normalized.break_mechanic,
         };
       }
@@ -439,7 +433,6 @@ export function SettingsContent() {
 
     if (snapshot.privacy_comfort !== 'off') {
       previousCameraChoicesRef.current = {
-        emotion_detection: snapshot.emotion_detection,
         break_mechanic: snapshot.break_mechanic,
       };
     }
@@ -504,21 +497,6 @@ export function SettingsContent() {
                   { value: 'off', label: 'Off' },
                 ]}
                 onChange={(value) => updateDraft({ privacy_comfort: value })}
-              />
-            </SettingRow>
-
-            <SettingRow
-              title="Emotion detection"
-              description="Run computer vision in the background to detect frustration and fatigue"
-              className={cameraOff ? 'opacity-70' : undefined}
-            >
-              <ToggleControl
-                id="emotionDetection"
-                checked={draftPreferences.emotion_detection}
-                disabled={cameraOff}
-                onCheckedChange={(checked) =>
-                  updateDraft({ emotion_detection: checked })
-                }
               />
             </SettingRow>
           </Section>

@@ -6,7 +6,6 @@ import { Camera, ChevronLeft, EyeOff, ShieldCheck } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import { saveOnboardingState } from '@/lib/frontend-store';
 import { cn } from '@/lib/utils';
 import {
@@ -51,7 +50,6 @@ const breakOptions: Array<{ value: BreakMechanic; label: string }> = [
 export default function PermissionsPage() {
   const router = useRouter();
   const previousCameraChoicesRef = useRef({
-    emotion_detection: true,
     break_mechanic: 'relaxed' as BreakMechanic,
   });
   const [preferences, setPreferences] = useState<UserPreferences>(
@@ -68,7 +66,6 @@ export default function PermissionsPage() {
         current.privacy_comfort !== 'off'
       ) {
         previousCameraChoicesRef.current = {
-          emotion_detection: current.emotion_detection,
           break_mechanic: current.break_mechanic,
         };
       }
@@ -78,15 +75,12 @@ export default function PermissionsPage() {
         patch.privacy_comfort !== 'off' &&
         current.privacy_comfort === 'off'
       ) {
-        next.emotion_detection =
-          previousCameraChoicesRef.current.emotion_detection;
         next.break_mechanic = previousCameraChoicesRef.current.break_mechanic;
       }
 
       const normalized = normalizeRuntimePreferences(next);
       if (normalized.privacy_comfort !== 'off') {
         previousCameraChoicesRef.current = {
-          emotion_detection: normalized.emotion_detection,
           break_mechanic: normalized.break_mechanic,
         };
       }
@@ -102,7 +96,6 @@ export default function PermissionsPage() {
     saveOnboardingState({
       cvMonitoringEnabled: normalized.privacy_comfort !== 'off',
       privacyComfort: normalized.privacy_comfort,
-      emotionDetection: normalized.emotion_detection,
       breakMechanic: normalized.break_mechanic,
     });
     router.push('/onboarding/complete');
@@ -151,31 +144,6 @@ export default function PermissionsPage() {
               </button>
             ))}
           </div>
-
-          <label
-            className={cn(
-              'flex items-center justify-between gap-4 rounded-md border border-[#2A2A35] bg-[#1C1C22] p-3',
-              cameraOff && 'opacity-50'
-            )}
-          >
-            <div>
-              <span className="text-[13px] font-semibold text-[#EAEAF0]">
-                Emotion detection
-              </span>
-              <p className="mt-1 text-xs text-[#9090A8]">
-                Detect frustration and fatigue during focus sessions.
-              </p>
-            </div>
-            <Checkbox
-              role="switch"
-              checked={preferences.emotion_detection}
-              disabled={cameraOff}
-              onCheckedChange={(checked) =>
-                updatePreferences({ emotion_detection: checked === true })
-              }
-              className="h-5 w-10 rounded-full border-0 bg-[#5b5c57] data-[state=checked]:bg-[#2dbd91]"
-            />
-          </label>
 
           <div className="space-y-3">
             <div>

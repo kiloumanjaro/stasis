@@ -66,11 +66,8 @@ export default function PomodoroPage() {
     longBreakDuration: settings.long_break_duration_minutes ?? 20,
   };
   const cameraEnabled = runtimePreferences.privacy_comfort !== 'off';
-  const emotionDetectionEnabled =
-    cameraEnabled && runtimePreferences.emotion_detection;
   const runtimePreferencesKey = [
     runtimePreferences.privacy_comfort,
-    runtimePreferences.emotion_detection,
     runtimePreferences.expression_tolerance,
     runtimePreferences.study_block_length,
     runtimePreferences.show_timer,
@@ -79,7 +76,7 @@ export default function PomodoroPage() {
   return (
     <CameraProvider>
       <CVProvider
-        enabled={emotionDetectionEnabled}
+        enabled={cameraEnabled}
         expressionTolerance={runtimePreferences.expression_tolerance}
       >
         <PomodoroContent
@@ -89,7 +86,6 @@ export default function PomodoroPage() {
           initialCameraVisible={
             runtimePreferences.privacy_comfort === 'visible'
           }
-          initialEmotionDetectionEnabled={emotionDetectionEnabled}
           showTimer={runtimePreferences.show_timer}
           cardAnimationEnabled={settings.card_animation_enabled ?? true}
           shortcutsEnabled={settings.shortcuts_enabled ?? true}

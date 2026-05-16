@@ -40,7 +40,6 @@ interface PomodoroContentProps {
   };
   initialCvMonitoringEnabled?: boolean;
   initialCameraVisible?: boolean;
-  initialEmotionDetectionEnabled?: boolean;
   showTimer?: boolean;
   cardAnimationEnabled?: boolean;
   shortcutsEnabled?: boolean;
@@ -50,7 +49,6 @@ export function PomodoroContent({
   initialTimerSettings,
   initialCvMonitoringEnabled = false,
   initialCameraVisible = initialCvMonitoringEnabled,
-  initialEmotionDetectionEnabled = true,
   showTimer = true,
   cardAnimationEnabled = true,
   shortcutsEnabled = true,
@@ -59,14 +57,14 @@ export function PomodoroContent({
     camera: { isOpen: initialCameraVisible },
     timer: { isOpen: false },
     monitor: {
-      isOpen: initialCvMonitoringEnabled && initialEmotionDetectionEnabled,
+      isOpen: initialCvMonitoringEnabled,
     },
     addFlashcards: { isOpen: false },
   });
   const [activeWidget, setActiveWidget] = useState<WidgetType | null>(
     initialCameraVisible
       ? 'camera'
-      : initialCvMonitoringEnabled && initialEmotionDetectionEnabled
+      : initialCvMonitoringEnabled
         ? 'monitor'
         : null
   );

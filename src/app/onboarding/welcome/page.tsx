@@ -31,7 +31,6 @@ export default function WelcomePage() {
       skipped: true,
       cvMonitoringEnabled: false,
       privacyComfort: skipPreferences.privacy_comfort,
-      emotionDetection: skipPreferences.emotion_detection,
       expressionTolerance: skipPreferences.expression_tolerance,
       studyBlockLength: skipPreferences.study_block_length,
       miniBreaksPerSession: skipPreferences.mini_breaks_per_session,

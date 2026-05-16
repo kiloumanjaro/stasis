@@ -36,7 +36,6 @@ export interface SettingsProfile {
   reminder_enabled?: boolean | null;
   reminder_time?: string | null;
   privacy_comfort?: PrivacyComfort | null;
-  emotion_detection?: boolean | null;
   expression_tolerance?: ExpressionTolerance | null;
   study_block_length?: number | null;
   mini_breaks_per_session?: number | null;
@@ -51,7 +50,6 @@ export interface OnboardingState {
   dailyGoalCards: number;
   cvMonitoringEnabled: boolean;
   privacyComfort: PrivacyComfort;
-  emotionDetection: boolean;
   expressionTolerance: ExpressionTolerance;
   studyBlockLength: number;
   miniBreaksPerSession: number;
@@ -111,7 +109,6 @@ export const DEFAULT_SETTINGS_PROFILE: SettingsProfile = {
   display_name: null,
   email: null,
   privacy_comfort: DEFAULT_RUNTIME_PREFERENCES.privacy_comfort,
-  emotion_detection: DEFAULT_RUNTIME_PREFERENCES.emotion_detection,
   expression_tolerance: DEFAULT_RUNTIME_PREFERENCES.expression_tolerance,
   study_block_length: DEFAULT_RUNTIME_PREFERENCES.study_block_length,
   mini_breaks_per_session: DEFAULT_RUNTIME_PREFERENCES.mini_breaks_per_session,
@@ -126,7 +123,6 @@ export const DEFAULT_ONBOARDING_STATE: OnboardingState = {
   dailyGoalCards: 20,
   cvMonitoringEnabled: false,
   privacyComfort: DEFAULT_RUNTIME_PREFERENCES.privacy_comfort,
-  emotionDetection: DEFAULT_RUNTIME_PREFERENCES.emotion_detection,
   expressionTolerance: DEFAULT_RUNTIME_PREFERENCES.expression_tolerance,
   studyBlockLength: DEFAULT_RUNTIME_PREFERENCES.study_block_length,
   miniBreaksPerSession: DEFAULT_RUNTIME_PREFERENCES.mini_breaks_per_session,
@@ -221,7 +217,6 @@ export function runtimePreferencesFromOnboardingState(
 ): UserPreferences {
   return normalizeRuntimePreferences({
     privacy_comfort: onboarding.privacyComfort,
-    emotion_detection: onboarding.emotionDetection,
     expression_tolerance: onboarding.expressionTolerance,
     study_block_length: onboarding.studyBlockLength,
     mini_breaks_per_session: onboarding.miniBreaksPerSession,
@@ -241,8 +236,6 @@ export function readRuntimePreferencesFromLocalState(): UserPreferences {
 
   return normalizeRuntimePreferences({
     privacy_comfort: storedSettings.privacy_comfort ?? legacyPrivacyComfort,
-    emotion_detection:
-      storedSettings.emotion_detection ?? onboarding.emotionDetection,
     expression_tolerance:
       storedSettings.expression_tolerance ?? onboarding.expressionTolerance,
     study_block_length:
@@ -268,7 +261,6 @@ export function getSettingsPatchForRuntimePreferences(
 
   return {
     privacy_comfort: normalized.privacy_comfort,
-    emotion_detection: normalized.emotion_detection,
     expression_tolerance: normalized.expression_tolerance,
     study_block_length: normalized.study_block_length,
     mini_breaks_per_session: normalized.mini_breaks_per_session,

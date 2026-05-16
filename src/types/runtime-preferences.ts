@@ -4,7 +4,6 @@ export type BreakMechanic = 'relaxed' | 'accountable';
 
 export interface UserPreferences {
   privacy_comfort: PrivacyComfort;
-  emotion_detection: boolean;
   expression_tolerance: ExpressionTolerance;
   study_block_length: number;
   mini_breaks_per_session: number;
@@ -24,7 +23,6 @@ export interface RuntimePreferencesResponse {
 
 export const DEFAULT_RUNTIME_PREFERENCES: UserPreferences = {
   privacy_comfort: 'off',
-  emotion_detection: false,
   expression_tolerance: 'neutral',
   study_block_length: 25,
   mini_breaks_per_session: 2,
@@ -77,10 +75,6 @@ export function normalizeRuntimePreferences(value: unknown): UserPreferences {
 
   const preferences: UserPreferences = {
     privacy_comfort: privacyComfort,
-    emotion_detection:
-      typeof record.emotion_detection === 'boolean'
-        ? record.emotion_detection
-        : privacyComfort !== 'off',
     expression_tolerance: expressionTolerance,
     study_block_length: clampNumber(
       record.study_block_length,
@@ -108,7 +102,6 @@ export function normalizeRuntimePreferences(value: unknown): UserPreferences {
   };
 
   if (preferences.privacy_comfort === 'off') {
-    preferences.emotion_detection = false;
     preferences.break_mechanic = 'relaxed';
   }
 
