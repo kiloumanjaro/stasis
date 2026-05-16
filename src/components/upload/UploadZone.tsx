@@ -2,11 +2,13 @@
 
 import type React from 'react';
 import { Icon } from '@iconify/react';
-import { CheckCircle2, FileText, Loader2, Upload } from 'lucide-react';
+import { CheckCircle2, FileText, Loader2, Upload, X } from 'lucide-react';
 
 import type { UploadedFile } from '@/components/upload/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 interface UploadZoneProps {
   file: File | null;
@@ -21,6 +23,13 @@ interface UploadZoneProps {
   onDrop: (e: React.DragEvent) => void;
   onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onPrimaryAction: () => void;
+  onCancel: () => void;
+  cardCount: number | string;
+  onCardCountChange: (count: number | string) => void;
+  deckTitle: string;
+  onDeckTitleChange: (title: string) => void;
+  deckDescription: string;
+  onDeckDescriptionChange: (description: string) => void;
 }
 
 export function UploadZone({
@@ -36,6 +45,13 @@ export function UploadZone({
   onDrop,
   onFileChange,
   onPrimaryAction,
+  onCancel,
+  cardCount,
+  onCardCountChange,
+  deckTitle,
+  onDeckTitleChange,
+  deckDescription,
+  onDeckDescriptionChange,
 }: UploadZoneProps) {
   const uploadState = uploading
     ? 'processing'
@@ -89,8 +105,18 @@ export function UploadZone({
         </Button>
 
         {(file || uploadedFile) && (
-          <div className="mt-6 w-full max-w-md">
-            <div className="rounded-lg border bg-card px-7 py-4">
+          <div className="relative mt-6 w-full max-w-md space-y-4">
+            {!uploading && (
+              <Button
+                onClick={onCancel}
+                variant="ghost"
+                size="icon"
+                className="absolute -right-3 -top-3 z-10 h-6 w-6 rounded-full bg-muted p-1 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+            <div className="relative overflow-hidden rounded-lg border bg-card px-7 py-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
                   <FileText className="h-7 w-7 text-primary" />
@@ -113,6 +139,69 @@ export function UploadZone({
                 ) : null}
               </div>
             </div>
+
+            {!uploading && (
+              <div className="space-y-4 rounded-lg border bg-[#1f1e1d] p-5 text-left text-sm">
+                <div className="space-y-1.5">
+                  <Label htmlFor="deckTitle">Deck Title (Optional)</Label>
+                  <Input
+                    id="deckTitle"
+                    placeholder="Leave blank to generate automatically"
+                    value={deckTitle}
+                    onChange={(e) => onDeckTitleChange(e.target.value)}
+                    disabled={uploading}
+                    className="border-[#4a4a46] bg-[#30302e]"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="deckDescription">
+                    Description (Optional)
+                  </Label>
+                  <Input
+                    id="deckDescription"
+                    placeholder="Leave blank to generate automatically"
+                    value={deckDescription}
+                    onChange={(e) => onDeckDescriptionChange(e.target.value)}
+                    disabled={uploading}
+                    className="border-[#4a4a46] bg-[#30302e]"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="cardCount">Flashcards to Generate</Label>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      id="cardCount"
+                      type="number"
+                      min={10}
+                      max={30}
+                      value={cardCount}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '') {
+                          onCardCountChange('');
+                          return;
+                        }
+                        const parsed = parseInt(val, 10);
+                        if (!isNaN(parsed)) onCardCountChange(parsed);
+                      }}
+                      onBlur={() => {
+                        let finalVal =
+                          typeof cardCount === 'number'
+                            ? cardCount
+                            : parseInt(cardCount, 10);
+                        if (isNaN(finalVal)) finalVal = 10;
+                        onCardCountChange(Math.min(Math.max(finalVal, 10), 30));
+                      }}
+                      disabled={uploading}
+                      className="w-24 border-[#4a4a46] bg-[#30302e]"
+                    />
+                    <span className="text-xs text-muted-foreground">
+                      Min 10, Max 30
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </CardContent>
