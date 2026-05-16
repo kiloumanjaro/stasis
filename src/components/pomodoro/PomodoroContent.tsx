@@ -129,7 +129,7 @@ export function PomodoroContent({
     <div className="relative flex h-full min-h-[calc(100vh-8rem)] flex-col">
       <InterventionLayer />
       {/* Header */}
-      <div className="relative mb-8">
+      <div className="mb-8 flex items-center justify-between">
         <h1 className="text-2xl">Pomodoro Timer</h1>
         <WidgetToggleBar
           cameraOpen={cameraOpen}

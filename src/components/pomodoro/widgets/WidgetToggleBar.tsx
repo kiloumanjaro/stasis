@@ -22,7 +22,7 @@ export function WidgetToggleBar({
   onToggleMonitor,
 }: WidgetToggleBarProps) {
   return (
-    <div className="absolute right-0 top-0 z-[55] flex items-center gap-2">
+    <div className="flex items-center gap-2">
       {/* Camera Toggle */}
       <Button
         variant="outline"
