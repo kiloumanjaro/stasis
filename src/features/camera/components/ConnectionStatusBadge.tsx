@@ -11,7 +11,7 @@ interface ConnectionStatusBadgeProps {
 }
 
 /**
- * Visual indicator for local model/camera readiness
+ * Visual indicator for WebSocket connection status
  */
 export function ConnectionStatusBadge({
   status,
@@ -22,7 +22,7 @@ export function ConnectionStatusBadge({
       case 'connected':
         return {
           icon: Wifi,
-          label: 'Ready',
+          label: 'Connected',
           variant: 'default' as const,
           className: 'bg-green-500/90 hover:bg-green-500/80 text-white',
           iconClassName: 'text-white',
@@ -30,7 +30,7 @@ export function ConnectionStatusBadge({
       case 'connecting':
         return {
           icon: Loader2,
-          label: 'Loading',
+          label: 'Connecting',
           variant: 'secondary' as const,
           className: 'bg-yellow-500/90 hover:bg-yellow-500/80 text-white',
           iconClassName: 'text-white animate-spin',
@@ -38,7 +38,7 @@ export function ConnectionStatusBadge({
       case 'reconnecting':
         return {
           icon: Loader2,
-          label: 'Retrying',
+          label: 'Reconnecting',
           variant: 'secondary' as const,
           className: 'bg-orange-500/90 hover:bg-orange-500/80 text-white',
           iconClassName: 'text-white animate-spin',
@@ -55,7 +55,7 @@ export function ConnectionStatusBadge({
       default:
         return {
           icon: WifiOff,
-          label: 'Idle',
+          label: 'Disconnected',
           variant: 'outline' as const,
           className: 'bg-muted text-muted-foreground',
           iconClassName: 'text-muted-foreground',

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { getAppShellViewportInsets } from '@/lib/app-shell';
 import { fsrsClient } from '@/lib/fsrs-client';
 import type { DeckWithStats } from '@/hooks/useDecks';
@@ -14,14 +14,6 @@ import {
   WidgetToggleBar,
 } from './widgets';
 import { useCameraContextSafe } from '@/features/camera/context/CameraContext';
-
-const WIDGET_WIDTH = Math.round(320 * 0.85); // 272 — 85% of original timer width
-const CAMERA_WIDGET_HEIGHT = 280; // estimated rendered height incl. header
-const WIDGET_VERTICAL_GAP = 12;
-const CAMERA_INITIAL_Y = 80;
-const MONITOR_INITIAL_Y =
-  CAMERA_INITIAL_Y + CAMERA_WIDGET_HEIGHT + WIDGET_VERTICAL_GAP;
-const TIMER_INITIAL_Y = 80;
 
 type WidgetType = 'camera' | 'timer' | 'monitor' | 'addFlashcards';
 
@@ -39,8 +31,6 @@ interface PomodoroContentProps {
     longBreakDuration?: number;
   };
   initialCvMonitoringEnabled?: boolean;
-  initialCameraVisible?: boolean;
-  showTimer?: boolean;
   cardAnimationEnabled?: boolean;
   shortcutsEnabled?: boolean;
 }
@@ -48,41 +38,23 @@ interface PomodoroContentProps {
 export function PomodoroContent({
   initialTimerSettings,
   initialCvMonitoringEnabled = false,
-  initialCameraVisible = initialCvMonitoringEnabled,
-  showTimer = true,
   cardAnimationEnabled = true,
   shortcutsEnabled = true,
 }: PomodoroContentProps) {
   const [widgets, setWidgets] = useState<WidgetState>({
-    camera: { isOpen: initialCameraVisible },
+    camera: { isOpen: initialCvMonitoringEnabled },
     timer: { isOpen: false },
-    monitor: {
-      isOpen: initialCvMonitoringEnabled,
-    },
+    monitor: { isOpen: initialCvMonitoringEnabled },
     addFlashcards: { isOpen: false },
   });
   const [activeWidget, setActiveWidget] = useState<WidgetType | null>(
-    initialCameraVisible
-      ? 'camera'
-      : initialCvMonitoringEnabled
-        ? 'monitor'
-        : null
+    initialCvMonitoringEnabled ? 'monitor' : null
   );
-  // Lazy initializers ensure correct positions on first client render,
-  // covering the edge case where a widget opens before the resize effect fires.
-  const [shellLeftInset, setShellLeftInset] = useState(() => {
-    if (typeof window === 'undefined') return 0;
-    return getAppShellViewportInsets().left;
-  });
-  const [timerInitialX, setTimerInitialX] = useState(() => {
-    if (typeof window === 'undefined') return 820;
-    return window.innerWidth - WIDGET_WIDTH - 20;
-  });
-  const [monitorInitialX, setMonitorInitialX] = useState(() => {
-    if (typeof window === 'undefined') return 84;
-    return getAppShellViewportInsets().left + 20;
-  });
+  const [shellLeftInset, setShellLeftInset] = useState(0);
+  const [timerInitialX, setTimerInitialX] = useState(0);
+  const [monitorInitialX, setMonitorInitialX] = useState(0);
 
+  // Payload for editing an existing deck
   const [editPayload, setEditPayload] = useState<{
     apiDeckId: number;
     deckTitle: string;
@@ -95,6 +67,7 @@ export function PomodoroContent({
     }[];
   } | null>(null);
 
+  // Open the AddFlashcardsWidget in edit mode for a given deck
   const openEditDeck = async (deck: DeckWithStats) => {
     try {
       const cards = await fsrsClient.cards.list(deck.id);
@@ -126,40 +99,35 @@ export function PomodoroContent({
     }
   };
 
+  // Calculate widget initial positions on mount
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const syncWidgetPositions = () => {
       const { left } = getAppShellViewportInsets();
       setShellLeftInset(left);
-      setMonitorInitialX(left + 20);
-      setTimerInitialX(window.innerWidth - WIDGET_WIDTH - 20);
+      setTimerInitialX(Math.max(left + 20, window.innerWidth - 360));
+      // Position monitor to the left of timer
+      setMonitorInitialX(Math.max(left + 20, window.innerWidth - 720));
     };
 
+    syncWidgetPositions();
     window.addEventListener('resize', syncWidgetPositions);
+
     return () => window.removeEventListener('resize', syncWidgetPositions);
   }, []);
 
   const camera = useCameraContextSafe();
-  const hiddenCameraVideoRef = useRef<HTMLVideoElement>(null);
   const isCameraActive = camera?.isCameraActive ?? false;
-
   useEffect(() => {
-    if (!initialCvMonitoringEnabled || initialCameraVisible) {
-      return;
-    }
-
-    camera?.registerVideoRef(hiddenCameraVideoRef);
-  }, [camera, initialCameraVisible, initialCvMonitoringEnabled]);
-
-  useEffect(() => {
-    if (!isCameraActive || !initialCameraVisible) return;
+    if (!isCameraActive) return;
     setWidgets((prev) =>
       prev.camera.isOpen ? prev : { ...prev, camera: { isOpen: true } }
     );
     setActiveWidget('camera');
-  }, [initialCameraVisible, isCameraActive]);
+  }, [isCameraActive]);
 
+  // Toggle widget visibility
   const toggleWidget = useCallback((widget: WidgetType) => {
     setWidgets((prev) => ({
       ...prev,
@@ -168,6 +136,7 @@ export function PomodoroContent({
     setActiveWidget(widget);
   }, []);
 
+  // Minimize widget (close it)
   const minimizeWidget = useCallback((widget: WidgetType) => {
     setWidgets((prev) => ({
       ...prev,
@@ -176,19 +145,23 @@ export function PomodoroContent({
     setActiveWidget(null);
   }, []);
 
+  // Focus widget (bring to front)
   const focusWidget = useCallback((widget: WidgetType) => {
     setActiveWidget(widget);
   }, []);
 
+  // Z-index values based on active widget
   const getZIndex = (widget: WidgetType): number => {
     return activeWidget === widget ? 70 : 60;
   };
 
   return (
     <div className="relative flex h-full min-h-[calc(100vh-8rem)] flex-col">
-      {/* Header */}
+      {/* Header with title and widget toggles */}
       <div className="relative mb-8">
         <h1 className="text-2xl">Pomodoro Timer</h1>
+
+        {/* Widget Toggle Buttons - positioned top-right */}
         <WidgetToggleBar
           cameraOpen={widgets.camera.isOpen}
           timerOpen={widgets.timer.isOpen}
@@ -199,7 +172,7 @@ export function PomodoroContent({
         />
       </div>
 
-      {/* Flashcard Practice Area */}
+      {/* Flashcard Practice Area - main focus */}
       <div className="flex flex-1 items-center justify-center">
         <FlashcardPracticeArea
           onRequestEditDeck={openEditDeck}
@@ -208,17 +181,7 @@ export function PomodoroContent({
         />
       </div>
 
-      {initialCvMonitoringEnabled && !initialCameraVisible && (
-        <video
-          ref={hiddenCameraVideoRef}
-          className="hidden"
-          autoPlay
-          muted
-          playsInline
-        />
-      )}
-
-      {/* Add Flashcards FAB */}
+      {/* Add Flashcards Button - floating action button */}
       <button
         onClick={() => toggleWidget('addFlashcards')}
         className="fixed bottom-8 right-8 z-50 rounded-full border border-[#4a4a46] bg-[#30302e] p-3 text-primary-foreground shadow-lg transition-transform hover:scale-105"
@@ -236,61 +199,54 @@ export function PomodoroContent({
           strokeLinecap="round"
           strokeLinejoin="round"
         >
-          <line x1="12" y1="5" x2="12" y2="19" />
-          <line x1="5" y1="12" x2="19" y2="12" />
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
         </svg>
       </button>
 
-      {/* Camera — left side, top */}
+      {/* Floating Camera Widget - anchors left */}
       <DraggableWidget
         isOpen={widgets.camera.isOpen}
         onMinimize={() => minimizeWidget('camera')}
         onFocus={() => focusWidget('camera')}
-        initialPosition={{ x: shellLeftInset + 20, y: CAMERA_INITIAL_Y }}
+        initialPosition={{ x: shellLeftInset + 20, y: 100 }}
         title="Camera"
         zIndex={getZIndex('camera')}
-        width={WIDGET_WIDTH}
-        minHeight={200}
+        width={320}
+        minHeight={280}
       >
         <CameraWidget />
       </DraggableWidget>
 
-      {/* Focus Monitor — left side, below Camera */}
-      <DraggableWidget
-        isOpen={widgets.monitor.isOpen}
-        onMinimize={() => minimizeWidget('monitor')}
-        onFocus={() => focusWidget('monitor')}
-        initialPosition={{
-          x: monitorInitialX || shellLeftInset + 20,
-          y: MONITOR_INITIAL_Y,
-        }}
-        title="Focus Monitor"
-        zIndex={getZIndex('monitor')}
-        width={WIDGET_WIDTH}
-        minHeight={380}
-      >
-        <CVMonitor />
-      </DraggableWidget>
-
-      {/* Pomodoro Timer — right side */}
+      {/* Floating Timer Widget - anchors right */}
       <DraggableWidget
         isOpen={widgets.timer.isOpen}
         onMinimize={() => minimizeWidget('timer')}
         onFocus={() => focusWidget('timer')}
-        initialPosition={{ x: timerInitialX || 820, y: TIMER_INITIAL_Y }}
+        initialPosition={{ x: timerInitialX || 800, y: 100 }}
         title="Pomodoro Timer"
         zIndex={getZIndex('timer')}
-        width={WIDGET_WIDTH}
-        minHeight={460}
+        width={320}
+        minHeight={520}
       >
-        <TimerWidget
-          initialSettings={initialTimerSettings}
-          cameraEnabled={initialCvMonitoringEnabled}
-          showTimer={showTimer}
-        />
+        <TimerWidget initialSettings={initialTimerSettings} />
       </DraggableWidget>
 
-      {/* Add Flashcards — center */}
+      {/* Floating CV Monitor Widget - positioned left of timer */}
+      <DraggableWidget
+        isOpen={widgets.monitor.isOpen}
+        onMinimize={() => minimizeWidget('monitor')}
+        onFocus={() => focusWidget('monitor')}
+        initialPosition={{ x: monitorInitialX || 440, y: 100 }}
+        title="Focus Monitor"
+        zIndex={getZIndex('monitor')}
+        width={340}
+        minHeight={400}
+      >
+        <CVMonitor />
+      </DraggableWidget>
+
+      {/* Floating Add Flashcards Widget - center */}
       <DraggableWidget
         isOpen={widgets.addFlashcards.isOpen}
         onMinimize={() => {
@@ -321,6 +277,7 @@ export function PomodoroContent({
           }
           initialFlashcards={editPayload?.flashcards}
           onSaved={() => {
+            // Close widget and refresh decks
             minimizeWidget('addFlashcards');
             setEditPayload(null);
             window.location.reload();

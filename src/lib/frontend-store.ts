@@ -13,6 +13,8 @@ import {
   type UserPreferences,
 } from '@/types/runtime-preferences';
 
+export type { PrivacyComfort, ExpressionTolerance };
+
 export type DefaultCardSort = 'due_date' | 'difficulty' | 'random';
 export type GazeSensitivity = 'low' | 'medium' | 'high';
 export type CompletionSound = 'none' | 'soft_chime' | 'bell';
@@ -49,13 +51,6 @@ export interface OnboardingState {
   breakDurationMinutes: number;
   dailyGoalCards: number;
   cvMonitoringEnabled: boolean;
-  privacyComfort: PrivacyComfort;
-  expressionTolerance: ExpressionTolerance;
-  studyBlockLength: number;
-  miniBreaksPerSession: number;
-  breakMechanic: BreakMechanic;
-  recoveryDuration: number;
-  showTimer: boolean;
   completed: boolean;
   skipped: boolean;
 }
@@ -122,13 +117,6 @@ export const DEFAULT_ONBOARDING_STATE: OnboardingState = {
   breakDurationMinutes: 5,
   dailyGoalCards: 20,
   cvMonitoringEnabled: false,
-  privacyComfort: DEFAULT_RUNTIME_PREFERENCES.privacy_comfort,
-  expressionTolerance: DEFAULT_RUNTIME_PREFERENCES.expression_tolerance,
-  studyBlockLength: DEFAULT_RUNTIME_PREFERENCES.study_block_length,
-  miniBreaksPerSession: DEFAULT_RUNTIME_PREFERENCES.mini_breaks_per_session,
-  breakMechanic: DEFAULT_RUNTIME_PREFERENCES.break_mechanic,
-  recoveryDuration: DEFAULT_RUNTIME_PREFERENCES.recovery_duration,
-  showTimer: DEFAULT_RUNTIME_PREFERENCES.show_timer,
   completed: false,
   skipped: false,
 };
@@ -212,20 +200,6 @@ export function readOnboardingState(): OnboardingState {
   };
 }
 
-export function runtimePreferencesFromOnboardingState(
-  onboarding = readOnboardingState()
-): UserPreferences {
-  return normalizeRuntimePreferences({
-    privacy_comfort: onboarding.privacyComfort,
-    expression_tolerance: onboarding.expressionTolerance,
-    study_block_length: onboarding.studyBlockLength,
-    mini_breaks_per_session: onboarding.miniBreaksPerSession,
-    break_mechanic: onboarding.breakMechanic,
-    recovery_duration: onboarding.recoveryDuration,
-    show_timer: onboarding.showTimer,
-  });
-}
-
 export function readRuntimePreferencesFromLocalState(): UserPreferences {
   const storedSettings = readStoredSettingsPatch();
   const onboarding = readOnboardingState();
@@ -236,21 +210,18 @@ export function readRuntimePreferencesFromLocalState(): UserPreferences {
 
   return normalizeRuntimePreferences({
     privacy_comfort: storedSettings.privacy_comfort ?? legacyPrivacyComfort,
-    expression_tolerance:
-      storedSettings.expression_tolerance ?? onboarding.expressionTolerance,
+    expression_tolerance: storedSettings.expression_tolerance ?? 'neutral',
     study_block_length:
       storedSettings.study_block_length ??
       storedSettings.focus_goal_minutes ??
-      onboarding.studyBlockLength ??
       onboarding.focusGoalMinutes,
-    mini_breaks_per_session:
-      storedSettings.mini_breaks_per_session ?? onboarding.miniBreaksPerSession,
-    break_mechanic: storedSettings.break_mechanic ?? onboarding.breakMechanic,
+    mini_breaks_per_session: storedSettings.mini_breaks_per_session ?? 2,
+    break_mechanic: storedSettings.break_mechanic ?? 'relaxed',
     recovery_duration:
       storedSettings.recovery_duration ??
       storedSettings.burnout_threshold_minutes ??
-      onboarding.recoveryDuration,
-    show_timer: storedSettings.show_timer ?? onboarding.showTimer,
+      10,
+    show_timer: storedSettings.show_timer ?? true,
   });
 }
 
@@ -295,14 +266,12 @@ export function markOnboardingComplete() {
   const onboarding = saveOnboardingState({
     completed: true,
   });
-  const runtimePreferences = runtimePreferencesFromOnboardingState(onboarding);
 
   saveSettingsProfile({
     focus_goal_minutes: onboarding.focusGoalMinutes,
     break_duration_minutes: onboarding.breakDurationMinutes,
     daily_goal_cards: onboarding.dailyGoalCards,
     cv_monitoring_enabled: onboarding.cvMonitoringEnabled,
-    ...getSettingsPatchForRuntimePreferences(runtimePreferences),
   });
 
   return onboarding;
@@ -516,7 +485,51 @@ export function clearFrontendAppState() {
     ONBOARDING_STORAGE_KEY,
     PREFERENCE_SUMMARY_STORAGE_KEY,
     FLASHCARD_STORAGE_KEY,
+    EMOTION_HISTORY_STORAGE_KEY,
   ].forEach((storageKey) => {
     window.localStorage.removeItem(storageKey);
   });
+}
+
+// ---------------------------------------------------------------------------
+// Emotion session history persistence
+// ---------------------------------------------------------------------------
+
+const EMOTION_HISTORY_STORAGE_KEY = 'stasis-emotion-history';
+
+export interface EmotionSessionEntry {
+  emotion: string;
+  confidence: number;
+  timestamp: number;
+}
+
+export interface EmotionSessionRecord {
+  sessionId: string;
+  startedAt: number;
+  endedAt: number;
+  entries: EmotionSessionEntry[];
+}
+
+interface EmotionHistoryStore {
+  sessions: EmotionSessionRecord[];
+}
+
+function getDefaultEmotionHistoryStore(): EmotionHistoryStore {
+  return { sessions: [] };
+}
+
+export function readEmotionHistory(): EmotionSessionRecord[] {
+  return readJson<EmotionHistoryStore>(
+    EMOTION_HISTORY_STORAGE_KEY,
+    getDefaultEmotionHistoryStore()
+  ).sessions;
+}
+
+export function saveEmotionSession(session: EmotionSessionRecord) {
+  const store = readJson<EmotionHistoryStore>(
+    EMOTION_HISTORY_STORAGE_KEY,
+    getDefaultEmotionHistoryStore()
+  );
+  store.sessions = [...store.sessions, session];
+  writeJson(EMOTION_HISTORY_STORAGE_KEY, store);
 }

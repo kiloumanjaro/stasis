@@ -45,35 +45,3 @@ export interface EmotionSnapshot {
   /** Optional confidence score */
   confidence?: number;
 }
-
-/**
- * Snapshot shape sent to the backend/socket transport layer
- */
-export interface EmotionTransportSnapshot {
-  emotion: CVResponse['emotion'];
-  gaze: CVResponse['gaze'];
-  confusion: boolean;
-  client_ts: number;
-  confidence?: number;
-}
-
-/**
- * Emotion recording session lifecycle state
- */
-export type EmotionRecordingState =
-  | 'idle'
-  | 'starting'
-  | 'recording'
-  | 'flushing'
-  | 'ending'
-  | 'error';
-
-/**
- * Reasons a frontend emotion recording session may stop
- */
-export type StopRecordingReason =
-  | 'pause'
-  | 'reset'
-  | 'break'
-  | 'complete'
-  | 'camera-stop';

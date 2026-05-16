@@ -13,7 +13,6 @@ import {
 } from '@/lib/preferences-client';
 import {
   readRuntimePreferencesFromLocalState,
-  runtimePreferencesFromOnboardingState,
   saveRuntimePreferencesToLocalProfile,
 } from '@/lib/frontend-store';
 import { cn } from '@/lib/utils';
@@ -244,9 +243,8 @@ export function SettingsContent() {
           hasRemotePreferences ? response.preferences : localPreferences
         );
         const snapshot = hasRemotePreferences
-          ? (response.onboarding_snapshot ??
-            runtimePreferencesFromOnboardingState())
-          : runtimePreferencesFromOnboardingState();
+          ? (response.onboarding_snapshot ?? DEFAULT_RUNTIME_PREFERENCES)
+          : DEFAULT_RUNTIME_PREFERENCES;
 
         if (!isMounted) {
           return;
@@ -283,7 +281,7 @@ export function SettingsContent() {
 
         setSavedPreferences(fallbackPreferences);
         setDraftPreferences(fallbackPreferences);
-        setOnboardingSnapshot(runtimePreferencesFromOnboardingState());
+        setOnboardingSnapshot(DEFAULT_RUNTIME_PREFERENCES);
         setStatus({
           type: 'error',
           message: 'Using local settings until preferences reconnect.',
@@ -399,8 +397,7 @@ export function SettingsContent() {
         setSavedPreferences(saved);
         setDraftPreferences(saved);
         setOnboardingSnapshot(
-          response.onboarding_snapshot ??
-            runtimePreferencesFromOnboardingState()
+          response.onboarding_snapshot ?? DEFAULT_RUNTIME_PREFERENCES
         );
         saveRuntimePreferencesToLocalProfile(saved);
         setForceDirty(false);
@@ -412,7 +409,7 @@ export function SettingsContent() {
         setSavedPreferences(preferences);
         setDraftPreferences(preferences);
         setOnboardingSnapshot(
-          (current) => current ?? runtimePreferencesFromOnboardingState()
+          (current) => current ?? DEFAULT_RUNTIME_PREFERENCES
         );
         saveRuntimePreferencesToLocalProfile(preferences);
         setForceDirty(false);

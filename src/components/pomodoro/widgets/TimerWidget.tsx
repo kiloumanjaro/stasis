@@ -15,8 +15,6 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCameraContextSafe } from '@/features/camera/context/CameraContext';
-import { useCVContextSafe } from '@/features/camera/context/CVContext';
-import type { StopRecordingReason } from '@/features/camera/types';
 
 type TimerMode = 'focus' | 'shortBreak' | 'longBreak';
 
@@ -29,8 +27,6 @@ interface TimerSettings {
 
 interface TimerWidgetProps {
   initialSettings?: Partial<TimerSettings>;
-  cameraEnabled?: boolean;
-  showTimer?: boolean;
 }
 
 const DEFAULT_SETTINGS: TimerSettings = {
@@ -52,37 +48,17 @@ let persistedState: {
   totalBreakTime: number;
 } | null = null;
 
-export function TimerWidget({
-  initialSettings,
-  cameraEnabled = true,
-  showTimer = true,
-}: TimerWidgetProps) {
-  const initialFocusDuration = initialSettings?.focusDuration;
-  const initialShortBreakDuration = initialSettings?.shortBreakDuration;
-  const initialLongBreakDuration = initialSettings?.longBreakDuration;
-  const initialSessionsBeforeLongBreak =
-    initialSettings?.sessionsBeforeLongBreak;
+export function TimerWidget({ initialSettings }: TimerWidgetProps) {
   const resolvedInitialSettings = useMemo(
     () => ({
       ...DEFAULT_SETTINGS,
-      ...(initialFocusDuration !== undefined
-        ? { focusDuration: initialFocusDuration }
-        : {}),
-      ...(initialShortBreakDuration !== undefined
-        ? { shortBreakDuration: initialShortBreakDuration }
-        : {}),
-      ...(initialLongBreakDuration !== undefined
-        ? { longBreakDuration: initialLongBreakDuration }
-        : {}),
-      ...(initialSessionsBeforeLongBreak !== undefined
-        ? { sessionsBeforeLongBreak: initialSessionsBeforeLongBreak }
-        : {}),
+      ...initialSettings,
     }),
     [
-      initialFocusDuration,
-      initialLongBreakDuration,
-      initialSessionsBeforeLongBreak,
-      initialShortBreakDuration,
+      initialSettings?.focusDuration,
+      initialSettings?.shortBreakDuration,
+      initialSettings?.longBreakDuration,
+      initialSettings?.sessionsBeforeLongBreak,
     ]
   );
 
@@ -154,44 +130,16 @@ export function TimerWidget({
   const camera = useCameraContextSafe();
   const cameraRef = useRef(camera);
   cameraRef.current = camera;
-  const cv = useCVContextSafe();
-  const cvRef = useRef(cv);
-  cvRef.current = cv;
-  const stopReasonRef = useRef<StopRecordingReason>('pause');
-  const shouldRecord = cameraEnabled && isRunning && mode === 'focus';
-  const previousShouldRecordRef = useRef(false);
 
   useEffect(() => {
-    cameraRef.current?.setSessionActive(
-      cameraEnabled && isRunning && mode === 'focus'
-    );
-  }, [cameraEnabled, isRunning, mode]);
+    cameraRef.current?.setSessionActive(isRunning && mode === 'focus');
+  }, [isRunning, mode]);
 
   useEffect(() => {
     return () => {
       cameraRef.current?.setSessionActive(false);
     };
   }, []);
-
-  useEffect(() => {
-    const previousShouldRecord = previousShouldRecordRef.current;
-
-    if (previousShouldRecord === shouldRecord) {
-      return;
-    }
-
-    previousShouldRecordRef.current = shouldRecord;
-
-    if (shouldRecord) {
-      stopReasonRef.current = 'pause';
-      void cvRef.current?.startRecordingSession();
-      return;
-    }
-
-    const stopReason = stopReasonRef.current;
-    stopReasonRef.current = 'pause';
-    void cvRef.current?.stopRecordingSession(stopReason);
-  }, [shouldRecord]);
 
   // Persist state to module-level variable
   useEffect(() => {
@@ -287,7 +235,6 @@ export function TimerWidget({
 
   // Handle timer completion
   const handleTimerComplete = useCallback(() => {
-    stopReasonRef.current = mode === 'focus' ? 'complete' : 'break';
     setIsRunning(false);
     setEndTime(null);
 
@@ -361,7 +308,6 @@ export function TimerWidget({
   };
 
   const handlePause = () => {
-    stopReasonRef.current = 'pause';
     // Store the remaining time when pausing
     if (endTime) {
       const remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
@@ -373,7 +319,6 @@ export function TimerWidget({
   };
 
   const handleReset = () => {
-    stopReasonRef.current = 'reset';
     setIsRunning(false);
     setEndTime(null);
     const duration = getDurationForMode(mode);
@@ -414,8 +359,6 @@ export function TimerWidget({
   // Calculate progress percentage
   const totalDuration = getDurationForMode(mode);
   const progress = ((totalDuration - displayTime) / totalDuration) * 100;
-  const shouldShowCountdown = showTimer || mode !== 'focus';
-  const displayedProgress = shouldShowCountdown ? progress : 0;
 
   return (
     <div className="flex flex-col gap-4">
@@ -441,14 +384,14 @@ export function TimerWidget({
           className="relative flex h-40 w-40 items-center justify-center rounded-full bg-muted"
           style={{
             background: `conic-gradient(
-              hsl(var(--primary)) ${displayedProgress}%, 
-              hsl(var(--muted)) ${displayedProgress}%
+              hsl(var(--primary)) ${progress}%, 
+              hsl(var(--muted)) ${progress}%
             )`,
           }}
         >
           <div className="flex h-36 w-36 items-center justify-center rounded-full bg-background">
-            <span className="text-3xl font-bold tabular-nums tracking-tight">
-              {shouldShowCountdown ? formatTime(displayTime) : 'Focus'}
+            <span className="font-mono text-3xl font-bold">
+              {formatTime(displayTime)}
             </span>
           </div>
         </div>
