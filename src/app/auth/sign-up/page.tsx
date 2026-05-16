@@ -5,21 +5,31 @@ export default function LoginPage() {
   return (
     <main className="min-h-screen bg-[#0f0f0f]">
       <SignupHeroEffects />
-      <div>
-        <div className="relative z-10 mt-24 flex w-5/12 flex-col items-center justify-center">
+      <div className="flex flex-col md:flex-row">
+        <div className="relative z-10 mt-12 flex w-full flex-col items-center justify-center md:mt-24 md:w-5/12">
           <div className="flex flex-row">
-            <p className="font-roboto text-9xl text-[#fafaf7]">st</p>
-            <p className="font-roboto text-9xl text-[#8a8bde]">a</p>
-            <p className="font-roboto text-9xl text-[#fafaf7]">s</p>
-            <p className="font-roboto text-9xl text-[#8a8bde]">i</p>
-            <p className="font-roboto text-9xl text-[#fafaf7]">s</p>
+            <p className="font-roboto text-[5rem] text-[#fafaf7] sm:text-[7.5rem] md:text-[10rem]">
+              st
+            </p>
+            <p className="font-roboto text-[5rem] text-[#8a8bde] sm:text-[7.5rem] md:text-[10rem]">
+              a
+            </p>
+            <p className="font-roboto text-[5rem] text-[#fafaf7] sm:text-[7.5rem] md:text-[10rem]">
+              s
+            </p>
+            <p className="font-roboto text-[5rem] text-[#8a8bde] sm:text-[7.5rem] md:text-[10rem]">
+              i
+            </p>
+            <p className="font-roboto text-[5rem] text-[#fafaf7] sm:text-[7.5rem] md:text-[10rem]">
+              s
+            </p>
           </div>
 
           <div className="p-6 text-center">
             <SignInWithGoogleButton />
           </div>
         </div>
-        <div className="h-full bg-red-500"></div>
+        <div className="hidden h-full bg-red-500 md:block md:w-7/12"></div>
       </div>
     </main>
   );
