@@ -2,7 +2,10 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { readOnboardingState } from '@/lib/frontend-store';
+import {
+  readOnboardingState,
+  checkOnboardingStatusWithBackend,
+} from '@/lib/frontend-store';
 
 export default function OnboardingLayout({
   children,
@@ -12,10 +15,29 @@ export default function OnboardingLayout({
   const router = useRouter();
 
   useEffect(() => {
-    const onboarding = readOnboardingState();
-    if (onboarding.completed) {
-      router.replace('/dashboard');
-    }
+    let isMounted = true;
+
+    const checkOnboardingStatus = async () => {
+      const localOnboarding = readOnboardingState();
+      if (localOnboarding.completed) {
+        if (isMounted) {
+          router.replace('/dashboard');
+        }
+        return;
+      }
+
+      // Also verify with backend to catch cross-device completion
+      const backendCompleted = await checkOnboardingStatusWithBackend();
+      if (backendCompleted && isMounted) {
+        router.replace('/dashboard');
+      }
+    };
+
+    void checkOnboardingStatus();
+
+    return () => {
+      isMounted = false;
+    };
   }, [router]);
 
   return <div className="min-h-screen bg-[#0f0f0f]">{children}</div>;

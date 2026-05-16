@@ -2,7 +2,6 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import {
@@ -112,10 +111,15 @@ export default function OnboardingSetupPage() {
     }
   }, [currentStep]);
 
-  const handleComplete = useCallback(() => {
+  const handleComplete = useCallback(async () => {
     setCompleting(true);
-    markOnboardingComplete(buildPreferences());
-    router.push('/dashboard');
+    try {
+      await markOnboardingComplete(buildPreferences());
+      router.push('/dashboard');
+    } catch (error) {
+      console.error('Error completing onboarding:', error);
+      setCompleting(false);
+    }
   }, [buildPreferences, router]);
 
   return (
@@ -182,11 +186,10 @@ export default function OnboardingSetupPage() {
               <Button
                 onClick={goBack}
                 variant="ghost"
-                size="icon"
-                className="rounded-full border border-[#2A2A35]"
+                className="px-8"
                 aria-label="Back"
               >
-                <ChevronLeft className="h-5 w-5" />
+                Back
               </Button>
               <Button
                 onClick={goForward}
@@ -201,11 +204,10 @@ export default function OnboardingSetupPage() {
               <Button
                 onClick={() => setCurrentStep(TOTAL_STEPS)}
                 variant="ghost"
-                size="icon"
-                className="rounded-full border border-[#2A2A35]"
+                className="px-8"
                 aria-label="Back"
               >
-                <ChevronLeft className="h-5 w-5" />
+                Back
               </Button>
               <Button
                 onClick={handleComplete}

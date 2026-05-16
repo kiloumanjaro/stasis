@@ -20,16 +20,19 @@ export default function WelcomePage() {
 
   const handleSkip = async () => {
     setSkipping(true);
-    markOnboardingComplete({ skipped: true });
-    router.push('/dashboard');
+    try {
+      await markOnboardingComplete({ skipped: true });
+      router.push('/dashboard');
+    } catch (error) {
+      console.error('Error skipping onboarding:', error);
+      setSkipping(false);
+    }
   };
 
   return (
     <div className="flex min-h-screen items-center justify-center">
       <div className="flex w-full max-w-[520px] flex-col items-center gap-8 px-6 text-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-[10px] bg-[#2D2860]">
-          <Image src="/images/icon.png" alt="Stasis" width={36} height={36} />
-        </div>
+        <Image src="/images/stasis.png" alt="Stasis" width={80} height={80} />
 
         <div className="space-y-3">
           <h1 className="text-[32px] font-bold leading-tight text-[#EAEAF0]">
