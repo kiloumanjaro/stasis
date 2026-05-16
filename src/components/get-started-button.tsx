@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { getBackendAuthUrl } from '@/lib/backend-auth';
 import { useState } from 'react';
 import React from 'react';
+import { toast } from 'sonner';
 
 const SignInWithGoogleButton = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -15,6 +16,11 @@ const SignInWithGoogleButton = () => {
       window.location.assign(url);
     } catch (error) {
       console.error('Failed to start Google sign-in:', error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Failed to start Google sign-in'
+      );
       setIsLoading(false);
     }
   };

@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { X, Plus, Check } from 'lucide-react';
 import { createFlashcardDeck, updateFlashcardDeck } from '@/lib/frontend-store';
 import { fsrsClient } from '@/lib/fsrs-client';
+import { toast } from 'sonner';
 
 interface FlashcardEntry {
   question: string;
@@ -218,9 +219,10 @@ export function AddFlashcardsWidget(props: AddFlashcardsWidgetProps) {
       props.onSaved?.();
       props.onClose();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Failed to save flashcards'
-      );
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to save flashcards';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

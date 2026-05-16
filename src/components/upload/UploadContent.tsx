@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Footer } from '@/components/dashboard/Footer';
-import { createFlashcardDeck } from '@/lib/frontend-store';
 import { fsrsClient } from '@/lib/fsrs-client';
 import { useDecks } from '@/hooks/useDecks';
 import { toast } from 'sonner';
@@ -10,35 +9,6 @@ import { SupportedFileTypes } from '@/components/upload/SupportedFileTypes';
 import { UploadHistorySection } from '@/components/upload/UploadHistorySection';
 import { UploadZone } from '@/components/upload/UploadZone';
 import type { UploadedFile } from '@/components/upload/types';
-
-function buildFlashcardsFromText(text: string, count = 10) {
-  const normalized = text.replace(/\r/g, '').trim();
-  const blocks = normalized
-    .split(/\n\s*\n/)
-    .map((block) => block.replace(/\s+/g, ' ').trim())
-    .filter(Boolean);
-  const units =
-    blocks.length > 0
-      ? blocks
-      : normalized
-          .split('\n')
-          .map((line) => line.replace(/\s+/g, ' ').trim())
-          .filter(Boolean);
-
-  return units.slice(0, count).map((unit, index) => {
-    const sentences = unit.split(/(?<=[.!?])\s+/).filter(Boolean);
-    const answer = unit;
-    const question =
-      sentences.length > 1
-        ? `What is the key idea in note ${index + 1}?`
-        : `Review note ${index + 1}: ${unit.slice(0, 48)}${unit.length > 48 ? '...' : ''}`;
-
-    return {
-      question,
-      answer,
-    };
-  });
-}
 
 export function UploadContent() {
   const [file, setFile] = useState<File | null>(null);
@@ -159,44 +129,18 @@ export function UploadContent() {
     const finalCount = isNaN(parsedCount) ? 10 : parsedCount;
 
     try {
-      if (rawFile.type === 'application/pdf') {
-        const formData = new FormData();
-        formData.append('pdf', rawFile);
-        formData.append('cardCount', finalCount.toString());
-        if (deckTitle.trim()) formData.append('name', deckTitle.trim());
-        if (deckDescription.trim())
-          formData.append('description', deckDescription.trim());
-        const result = await fsrsClient.decks.create(formData);
-        toast.success(
-          `Created deck "${result.deck.name}" with ${result.cards.length} AI-generated cards.`
-        );
-      } else {
-        if (!uploadedFile.extractedText) {
-          toast.error(
-            'This file does not contain readable text to turn into flashcards.'
-          );
-          return;
-        }
-        const flashcards = buildFlashcardsFromText(
-          uploadedFile.extractedText,
-          finalCount
-        );
-        if (flashcards.length === 0) {
-          throw new Error('Could not derive any flashcards from this file');
-        }
-        const finalTitle =
-          deckTitle.trim() || uploadedFile.fileName.replace(/\.[^/.]+$/, '');
-        const finalDesc =
-          deckDescription.trim() || `Generated from ${uploadedFile.fileName}`;
-        const deck = createFlashcardDeck({
-          deckTitle: finalTitle,
-          description: finalDesc,
-          flashcards,
-        });
-        toast.success(
-          `Saved ${flashcards.length} flashcards in deck "${deck.fc_name}".`
-        );
-      }
+      const formData = new FormData();
+      formData.append('file', rawFile);
+      formData.append('cardCount', finalCount.toString());
+      if (deckTitle.trim()) formData.append('name', deckTitle.trim());
+      if (deckDescription.trim())
+        formData.append('description', deckDescription.trim());
+
+      const result = await fsrsClient.decks.create(formData);
+
+      toast.success(
+        `Created deck "${result.deck.name}" with ${result.cards.length} AI-generated cards.`
+      );
       // Reset upload state after successful generation
       setFile(null);
       setRawFile(null);
@@ -204,6 +148,7 @@ export function UploadContent() {
       setDeckTitle('');
       setDeckDescription('');
       setCardCount(10);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       void fetchDecks();
     } catch (err) {
       toast.error(
@@ -281,6 +226,7 @@ export function UploadContent() {
           setDeckTitle('');
           setDeckDescription('');
           setCardCount(10);
+          if (fileInputRef.current) fileInputRef.current.value = '';
         }}
         cardCount={cardCount}
         onCardCountChange={setCardCount}

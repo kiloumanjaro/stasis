@@ -106,16 +106,15 @@ export function UploadZone({
 
         {(file || uploadedFile) && (
           <div className="relative mt-6 w-full max-w-md space-y-4">
-            {!uploading && (
-              <Button
-                onClick={onCancel}
-                variant="ghost"
-                size="icon"
-                className="absolute -right-3 -top-3 z-10 h-6 w-6 rounded-full bg-muted p-1 text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
+            <Button
+              onClick={onCancel}
+              variant="ghost"
+              size="icon"
+              disabled={uploading}
+              className="absolute -right-3 -top-3 z-10 h-6 w-6 rounded-full bg-muted p-1 text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+            >
+              <X className="h-4 w-4" />
+            </Button>
             <div className="relative overflow-hidden rounded-lg border bg-card px-7 py-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
@@ -140,68 +139,66 @@ export function UploadZone({
               </div>
             </div>
 
-            {!uploading && (
-              <div className="space-y-4 rounded-lg border bg-[#1f1e1d] p-5 text-left text-sm">
-                <div className="space-y-1.5">
-                  <Label htmlFor="deckTitle">Deck Title (Optional)</Label>
+            <div
+              className={`space-y-4 rounded-lg border bg-[#1f1e1d] p-5 text-left text-sm transition-opacity ${uploading ? 'pointer-events-none opacity-50' : ''}`}
+            >
+              <div className="space-y-1.5">
+                <Label htmlFor="deckTitle">Deck Title (Optional)</Label>
+                <Input
+                  id="deckTitle"
+                  placeholder="Leave blank to generate automatically"
+                  value={deckTitle}
+                  onChange={(e) => onDeckTitleChange(e.target.value)}
+                  disabled={uploading}
+                  className="border-[#4a4a46] bg-[#30302e]"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="deckDescription">Description (Optional)</Label>
+                <Input
+                  id="deckDescription"
+                  placeholder="Leave blank to generate automatically"
+                  value={deckDescription}
+                  onChange={(e) => onDeckDescriptionChange(e.target.value)}
+                  disabled={uploading}
+                  className="border-[#4a4a46] bg-[#30302e]"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="cardCount">Flashcards to Generate</Label>
+                <div className="flex items-center gap-3">
                   <Input
-                    id="deckTitle"
-                    placeholder="Leave blank to generate automatically"
-                    value={deckTitle}
-                    onChange={(e) => onDeckTitleChange(e.target.value)}
+                    id="cardCount"
+                    type="number"
+                    min={10}
+                    max={30}
+                    value={cardCount}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '') {
+                        onCardCountChange('');
+                        return;
+                      }
+                      const parsed = parseInt(val, 10);
+                      if (!isNaN(parsed)) onCardCountChange(parsed);
+                    }}
+                    onBlur={() => {
+                      let finalVal =
+                        typeof cardCount === 'number'
+                          ? cardCount
+                          : parseInt(cardCount, 10);
+                      if (isNaN(finalVal)) finalVal = 10;
+                      onCardCountChange(Math.min(Math.max(finalVal, 10), 30));
+                    }}
                     disabled={uploading}
-                    className="border-[#4a4a46] bg-[#30302e]"
+                    className="w-24 border-[#4a4a46] bg-[#30302e]"
                   />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="deckDescription">
-                    Description (Optional)
-                  </Label>
-                  <Input
-                    id="deckDescription"
-                    placeholder="Leave blank to generate automatically"
-                    value={deckDescription}
-                    onChange={(e) => onDeckDescriptionChange(e.target.value)}
-                    disabled={uploading}
-                    className="border-[#4a4a46] bg-[#30302e]"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="cardCount">Flashcards to Generate</Label>
-                  <div className="flex items-center gap-3">
-                    <Input
-                      id="cardCount"
-                      type="number"
-                      min={10}
-                      max={30}
-                      value={cardCount}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === '') {
-                          onCardCountChange('');
-                          return;
-                        }
-                        const parsed = parseInt(val, 10);
-                        if (!isNaN(parsed)) onCardCountChange(parsed);
-                      }}
-                      onBlur={() => {
-                        let finalVal =
-                          typeof cardCount === 'number'
-                            ? cardCount
-                            : parseInt(cardCount, 10);
-                        if (isNaN(finalVal)) finalVal = 10;
-                        onCardCountChange(Math.min(Math.max(finalVal, 10), 30));
-                      }}
-                      disabled={uploading}
-                      className="w-24 border-[#4a4a46] bg-[#30302e]"
-                    />
-                    <span className="text-xs text-muted-foreground">
-                      Min 10, Max 30
-                    </span>
-                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    Min 10, Max 30
+                  </span>
                 </div>
               </div>
-            )}
+            </div>
           </div>
         )}
       </CardContent>

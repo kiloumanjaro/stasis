@@ -1,9 +1,14 @@
 import SignInWithGoogleButton from '@/components/get-started-button';
 import SignupHeroEffects from '@/components/signup/SignupHeroEffects';
+import AuthErrorToast from '@/components/auth/AuthErrorToast';
+import { Suspense } from 'react';
 
 export default function LoginPage() {
   return (
     <main className="min-h-screen bg-[#0f0f0f]">
+      <Suspense fallback={null}>
+        <AuthErrorToast />
+      </Suspense>
       <SignupHeroEffects />
       <div className="flex flex-col md:flex-row">
         <div className="relative z-10 mt-12 flex w-full flex-col items-center justify-center md:mt-24 md:w-5/12">
