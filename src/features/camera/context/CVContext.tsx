@@ -31,6 +31,7 @@ import type {
   EmotionTransportSnapshot,
   StopRecordingReason,
 } from '../types';
+import type { ExpressionTolerance } from '@/types/runtime-preferences';
 
 const HISTORY_CONFIG = {
   maxHistoryLength: 100,
@@ -65,6 +66,8 @@ const CVContext = createContext<CVContextType | null>(null);
 
 interface CVProviderProps {
   children: ReactNode;
+  enabled?: boolean;
+  expressionTolerance?: ExpressionTolerance;
 }
 
 function toEmotionSnapshot(data: CVResponse): EmotionSnapshot {
@@ -104,14 +107,20 @@ function getEndSessionStats(sessionSummary: {
   };
 }
 
-export function CVProvider({ children }: CVProviderProps) {
+export function CVProvider({
+  children,
+  enabled = true,
+  expressionTolerance = 'neutral',
+}: CVProviderProps) {
   const cameraContext = useCameraContextSafe();
   const videoRef = cameraContext?.videoRef;
   const isCameraActive = cameraContext?.isCameraActive ?? false;
   const cameraError = cameraContext?.errorMessage ?? null;
 
-  const { connectionStatus, latestCVData, error, isModelLoaded } =
-    useFaceApiCV(videoRef);
+  const { connectionStatus, latestCVData, error, isModelLoaded } = useFaceApiCV(
+    videoRef,
+    { enabled, expressionTolerance }
+  );
 
   const [history, setHistory] = useState<EmotionSnapshot[]>([]);
   const [recordingState, setRecordingState] =
@@ -145,8 +154,8 @@ export function CVProvider({ children }: CVProviderProps) {
   const localStatus: ConnectionStatus = cameraError
     ? 'error'
     : connectionStatus;
-  const isConnected = localStatus === 'connected' && isModelLoaded;
-  const isCapturing = isConnected && isCameraActive;
+  const isConnected = enabled && localStatus === 'connected' && isModelLoaded;
+  const isCapturing = enabled && isConnected && isCameraActive;
 
   const setRecordingStateSafe = useCallback((next: EmotionRecordingState) => {
     recordingStateRef.current = next;

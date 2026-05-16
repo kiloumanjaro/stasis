@@ -5,24 +5,25 @@ import {
 } from '@/components/pomodoro/spacedRepetition';
 import type { AdaptiveStudyParameters } from '@/types/preferences';
 import { completeOnboarding, getOnboardingStatus } from '@/lib/onboarding';
+import {
+  DEFAULT_RUNTIME_PREFERENCES,
+  normalizeRuntimePreferences,
+  type BreakMechanic,
+  type ExpressionTolerance,
+  type PrivacyComfort,
+  type UserPreferences,
+} from '@/types/runtime-preferences';
+
+export type { PrivacyComfort, ExpressionTolerance };
 
 export type DefaultCardSort = 'due_date' | 'difficulty' | 'random';
 export type GazeSensitivity = 'low' | 'medium' | 'high';
 export type CompletionSound = 'none' | 'soft_chime' | 'bell';
-export type PrivacyComfort = 'visible' | 'hidden' | 'off';
-export type ExpressionTolerance = 'neutral' | 'intense' | 'variable';
 
 export interface SettingsProfile {
   id?: string;
   email?: string | null;
   display_name?: string | null;
-  privacy_comfort?: PrivacyComfort | null;
-  expression_tolerance?: ExpressionTolerance | null;
-  study_block_length?: number | null;
-  mini_breaks_per_session?: number | null;
-  recovery_duration?: number | null;
-  break_mechanic?: OnboardingState['break_mechanic'] | null;
-  show_timer?: boolean | null;
   focus_goal_minutes?: number | null;
   break_duration_minutes?: number | null;
   long_break_duration_minutes?: number | null;
@@ -37,15 +38,22 @@ export interface SettingsProfile {
   completion_sound?: CompletionSound | null;
   reminder_enabled?: boolean | null;
   reminder_time?: string | null;
+  privacy_comfort?: PrivacyComfort | null;
+  expression_tolerance?: ExpressionTolerance | null;
+  study_block_length?: number | null;
+  mini_breaks_per_session?: number | null;
+  break_mechanic?: BreakMechanic | null;
+  recovery_duration?: number | null;
+  show_timer?: boolean | null;
 }
 
 export interface OnboardingState {
-  privacy_comfort: 'visible' | 'hidden' | 'off';
-  expression_tolerance: 'neutral' | 'intense' | 'variable';
+  privacy_comfort: PrivacyComfort;
+  expression_tolerance: ExpressionTolerance;
   study_block_length: number;
   mini_breaks_per_session: number;
+  break_mechanic: BreakMechanic;
   recovery_duration: number;
-  break_mechanic: 'relaxed' | 'accountable';
   show_timer: boolean;
   completed: boolean;
   skipped: boolean;
@@ -83,13 +91,6 @@ const PREFERENCE_SUMMARY_STORAGE_KEY = 'stasis-preference-summary';
 const FLASHCARD_STORAGE_KEY = 'stasis-flashcards';
 
 export const DEFAULT_SETTINGS_PROFILE: SettingsProfile = {
-  privacy_comfort: 'visible',
-  expression_tolerance: 'neutral',
-  study_block_length: 25,
-  mini_breaks_per_session: 2,
-  recovery_duration: 10,
-  break_mechanic: 'relaxed',
-  show_timer: true,
   focus_goal_minutes: 25,
   break_duration_minutes: 5,
   long_break_duration_minutes: 20,
@@ -106,16 +107,23 @@ export const DEFAULT_SETTINGS_PROFILE: SettingsProfile = {
   reminder_time: '08:00',
   display_name: null,
   email: null,
+  privacy_comfort: DEFAULT_RUNTIME_PREFERENCES.privacy_comfort,
+  expression_tolerance: DEFAULT_RUNTIME_PREFERENCES.expression_tolerance,
+  study_block_length: DEFAULT_RUNTIME_PREFERENCES.study_block_length,
+  mini_breaks_per_session: DEFAULT_RUNTIME_PREFERENCES.mini_breaks_per_session,
+  break_mechanic: DEFAULT_RUNTIME_PREFERENCES.break_mechanic,
+  recovery_duration: DEFAULT_RUNTIME_PREFERENCES.recovery_duration,
+  show_timer: DEFAULT_RUNTIME_PREFERENCES.show_timer,
 };
 
 export const DEFAULT_ONBOARDING_STATE: OnboardingState = {
-  privacy_comfort: 'visible',
-  expression_tolerance: 'neutral',
-  study_block_length: 25,
-  mini_breaks_per_session: 2,
-  recovery_duration: 10,
-  break_mechanic: 'relaxed',
-  show_timer: true,
+  privacy_comfort: DEFAULT_RUNTIME_PREFERENCES.privacy_comfort,
+  expression_tolerance: DEFAULT_RUNTIME_PREFERENCES.expression_tolerance,
+  study_block_length: DEFAULT_RUNTIME_PREFERENCES.study_block_length,
+  mini_breaks_per_session: DEFAULT_RUNTIME_PREFERENCES.mini_breaks_per_session,
+  break_mechanic: DEFAULT_RUNTIME_PREFERENCES.break_mechanic,
+  recovery_duration: DEFAULT_RUNTIME_PREFERENCES.recovery_duration,
+  show_timer: DEFAULT_RUNTIME_PREFERENCES.show_timer,
   completed: false,
   skipped: false,
 };
@@ -149,6 +157,10 @@ function writeJson<T>(storageKey: string, value: T) {
   }
 
   window.localStorage.setItem(storageKey, JSON.stringify(value));
+}
+
+function readStoredSettingsPatch(): Partial<SettingsProfile> {
+  return readJson<Partial<SettingsProfile>>(SETTINGS_STORAGE_KEY, {});
 }
 
 function normalizeQuestionId(
@@ -195,6 +207,75 @@ export function readOnboardingState(): OnboardingState {
   };
 }
 
+export function runtimePreferencesFromOnboardingState(
+  onboarding = readOnboardingState()
+): UserPreferences {
+  return normalizeRuntimePreferences({
+    privacy_comfort: onboarding.privacy_comfort,
+    expression_tolerance: onboarding.expression_tolerance,
+    study_block_length: onboarding.study_block_length,
+    mini_breaks_per_session: onboarding.mini_breaks_per_session,
+    break_mechanic: onboarding.break_mechanic,
+    recovery_duration: onboarding.recovery_duration,
+    show_timer: onboarding.show_timer,
+  });
+}
+
+export function readRuntimePreferencesFromLocalState(): UserPreferences {
+  const storedSettings = readStoredSettingsPatch();
+  const onboarding = readOnboardingState();
+  const localCameraEnabled =
+    storedSettings.cv_monitoring_enabled ??
+    onboarding.privacy_comfort !== 'off';
+  const legacyPrivacyComfort = localCameraEnabled ? 'hidden' : 'off';
+
+  return normalizeRuntimePreferences({
+    privacy_comfort: storedSettings.privacy_comfort ?? legacyPrivacyComfort,
+    expression_tolerance:
+      storedSettings.expression_tolerance ?? onboarding.expression_tolerance,
+    study_block_length:
+      storedSettings.study_block_length ??
+      storedSettings.focus_goal_minutes ??
+      onboarding.study_block_length,
+    mini_breaks_per_session:
+      storedSettings.mini_breaks_per_session ??
+      onboarding.mini_breaks_per_session,
+    break_mechanic: storedSettings.break_mechanic ?? onboarding.break_mechanic,
+    recovery_duration:
+      storedSettings.recovery_duration ??
+      storedSettings.burnout_threshold_minutes ??
+      onboarding.recovery_duration,
+    show_timer: storedSettings.show_timer ?? onboarding.show_timer,
+  });
+}
+
+export function getSettingsPatchForRuntimePreferences(
+  preferences: UserPreferences
+): Partial<SettingsProfile> {
+  const normalized = normalizeRuntimePreferences(preferences);
+
+  return {
+    privacy_comfort: normalized.privacy_comfort,
+    expression_tolerance: normalized.expression_tolerance,
+    study_block_length: normalized.study_block_length,
+    mini_breaks_per_session: normalized.mini_breaks_per_session,
+    break_mechanic: normalized.break_mechanic,
+    recovery_duration: normalized.recovery_duration,
+    show_timer: normalized.show_timer,
+    focus_goal_minutes: normalized.study_block_length,
+    cv_monitoring_enabled: normalized.privacy_comfort !== 'off',
+    burnout_threshold_minutes: normalized.recovery_duration,
+  };
+}
+
+export function saveRuntimePreferencesToLocalProfile(
+  preferences: UserPreferences
+) {
+  return saveSettingsProfile(
+    getSettingsPatchForRuntimePreferences(preferences)
+  );
+}
+
 export function saveOnboardingState(patch: Partial<OnboardingState>) {
   const nextState = {
     ...readOnboardingState(),
@@ -212,6 +293,7 @@ export async function markOnboardingComplete(
     ...patch,
     completed: true,
   });
+  const runtimePreferences = runtimePreferencesFromOnboardingState(onboarding);
 
   try {
     await completeOnboarding({
@@ -228,16 +310,10 @@ export async function markOnboardingComplete(
   }
 
   saveSettingsProfile({
-    privacy_comfort: onboarding.privacy_comfort,
-    expression_tolerance: onboarding.expression_tolerance,
-    study_block_length: onboarding.study_block_length,
-    mini_breaks_per_session: onboarding.mini_breaks_per_session,
-    recovery_duration: onboarding.recovery_duration,
-    break_mechanic: onboarding.break_mechanic,
-    show_timer: onboarding.show_timer,
     focus_goal_minutes: onboarding.study_block_length,
     break_duration_minutes: onboarding.recovery_duration,
     cv_monitoring_enabled: onboarding.privacy_comfort !== 'off',
+    ...getSettingsPatchForRuntimePreferences(runtimePreferences),
   });
 
   return onboarding;

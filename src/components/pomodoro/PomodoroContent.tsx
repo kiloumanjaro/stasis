@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { getAppShellViewportInsets } from '@/lib/app-shell';
 import { fsrsClient } from '@/lib/fsrs-client';
@@ -34,6 +34,8 @@ interface PomodoroContentProps {
     longBreakDuration?: number;
   };
   initialCvMonitoringEnabled?: boolean;
+  initialCameraVisible?: boolean;
+  showTimer?: boolean;
   cardAnimationEnabled?: boolean;
   shortcutsEnabled?: boolean;
 }
@@ -41,11 +43,13 @@ interface PomodoroContentProps {
 export function PomodoroContent({
   initialTimerSettings,
   initialCvMonitoringEnabled = false,
+  initialCameraVisible = initialCvMonitoringEnabled,
+  showTimer = true,
   cardAnimationEnabled = true,
   shortcutsEnabled = true,
 }: PomodoroContentProps) {
   // Separate booleans for each drawer
-  const [cameraOpen, setCameraOpen] = useState(initialCvMonitoringEnabled);
+  const [cameraOpen, setCameraOpen] = useState(initialCameraVisible);
   const [timerOpen, setTimerOpen] = useState(false);
   const [monitorOpen, setMonitorOpen] = useState(initialCvMonitoringEnabled);
 
@@ -114,11 +118,21 @@ export function PomodoroContent({
   }, []);
 
   const camera = useCameraContextSafe();
+  const hiddenCameraVideoRef = useRef<HTMLVideoElement>(null);
   const isCameraActive = camera?.isCameraActive ?? false;
+
   useEffect(() => {
-    if (!isCameraActive) return;
+    if (!initialCvMonitoringEnabled || initialCameraVisible) {
+      return;
+    }
+
+    camera?.registerVideoRef(hiddenCameraVideoRef);
+  }, [camera, initialCameraVisible, initialCvMonitoringEnabled]);
+
+  useEffect(() => {
+    if (!isCameraActive || !initialCameraVisible) return;
     setCameraOpen(true);
-  }, [isCameraActive]);
+  }, [initialCameraVisible, isCameraActive]);
 
   const minimizeAddFlashcards = useCallback(() => {
     setAddFlashcardsOpen(false);
@@ -149,6 +163,16 @@ export function PomodoroContent({
           shortcutsEnabled={shortcutsEnabled}
         />
       </div>
+
+      {initialCvMonitoringEnabled && !initialCameraVisible && (
+        <video
+          ref={hiddenCameraVideoRef}
+          className="hidden"
+          autoPlay
+          muted
+          playsInline
+        />
+      )}
 
       {/* Add Flashcards FAB */}
       <button
@@ -226,7 +250,11 @@ export function PomodoroContent({
             </DrawerClose>
           </DrawerHeader>
           <div className="overflow-y-auto p-4">
-            <TimerWidget initialSettings={initialTimerSettings} />
+            <TimerWidget
+              initialSettings={initialTimerSettings}
+              cameraEnabled={initialCvMonitoringEnabled}
+              showTimer={showTimer}
+            />
           </div>
         </DrawerContent>
       </Drawer>
