@@ -236,7 +236,7 @@ export function FlashcardPracticeArea({
               </h2>
               <button
                 onClick={handleOptionalStop}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#4a4a46] text-gray-400 transition-colors hover:border-[#5a5a56] hover:bg-[#4a4a46] hover:text-white"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#e5e5df] bg-[#1a1a18] text-[#e5e5df] transition-colors hover:bg-[#2a2a28]"
                 aria-label="Back to decks"
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -291,17 +291,19 @@ export function FlashcardPracticeArea({
   if (!selectedDeck) {
     return (
       <div className="flex w-full flex-1 items-center justify-center">
-        <div className="w-full max-w-3xl rounded-lg border border-[#4a4a46]/50 bg-[#0f0f0f] p-6">
+        <div className="min-h-[320px] w-full max-w-3xl">
           {error && (
             <div className="mb-6 rounded-lg border border-red-500/50 bg-red-900/20 p-4">
               <p className="text-red-300">{error}</p>
             </div>
           )}
-          {isLoadingDeck ? (
-            <LoadingSpinner />
+          {isLoadingDeck && decks.length === 0 ? (
+            <div className="flex w-full items-center justify-center rounded-lg border border-[#4a4a46] bg-[#30302e] px-12 py-12">
+              <LoadingSpinner />
+            </div>
           ) : decks.length === 0 ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="w-full max-w-2xl rounded-lg border-2 border-dashed border-[#4a4a46] px-12 py-12 text-center">
+            <div className="flex items-center justify-center">
+              <div className="w-full rounded-lg border border-[#4a4a46] bg-[#30302e] px-12 py-12 text-center">
                 <div className="mb-6 flex justify-center">
                   <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#4a4a46]">
                     <svg
@@ -568,7 +570,7 @@ export function FlashcardPracticeArea({
               <h2 className="text-2xl font-bold text-white">No Cards Due</h2>
               <button
                 onClick={handleOptionalStop}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#4a4a46] text-gray-400 transition-colors hover:border-[#5a5a56] hover:bg-[#4a4a46] hover:text-white"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#e5e5df] bg-[#1a1a18] text-[#e5e5df] transition-colors hover:bg-[#2a2a28]"
                 aria-label="Back to decks"
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -622,7 +624,7 @@ export function FlashcardPracticeArea({
               </h2>
               <button
                 onClick={handleOptionalStop}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#4a4a46] text-gray-400 transition-colors hover:border-[#5a5a56] hover:bg-[#4a4a46] hover:text-white"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#e5e5df] bg-[#1a1a18] text-[#e5e5df] transition-colors hover:bg-[#2a2a28]"
                 aria-label="Back to decks"
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -675,13 +677,26 @@ export function FlashcardPracticeArea({
         {/* Header */}
         <div className="mb-8">
           <div className="mb-6 flex items-center justify-between">
-            <div>
-              <h2 className="mb-1 text-2xl font-bold text-white">Flashcards</h2>
-              <p className="text-gray-400">{selectedDeck?.name}</p>
+            <div className="flex items-center gap-3">
+              <h2 className="text-2xl font-bold text-white">Flashcards</h2>
+              <span className="flex items-center gap-1 text-sm text-white">
+                <Clock className="h-3.5 w-3.5" />
+                <span
+                  className={`transition-all duration-300 ${
+                    dueCountAnimation === 'subtract' ? 'text-red-400' : ''
+                  }`}
+                >
+                  {dueCount}
+                </span>
+              </span>
+              <span className="flex items-center gap-1 text-sm text-white">
+                <Layers className="h-3.5 w-3.5" />
+                {totalCards}
+              </span>
             </div>
             <button
               onClick={handleOptionalStop}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-[#4a4a46] text-gray-400 transition-colors hover:border-[#5a5a56] hover:bg-[#4a4a46] hover:text-white"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#e5e5df] bg-[#1a1a18] text-[#e5e5df] transition-colors hover:bg-[#2a2a28]"
               aria-label="Exit deck"
             >
               <svg
@@ -699,26 +714,7 @@ export function FlashcardPracticeArea({
               </svg>
             </button>
           </div>
-          <div className="mb-6 flex gap-6 text-sm">
-            <div>
-              <span className="text-gray-400">Due:</span>
-              <span
-                className={`ml-2 font-semibold text-white transition-all duration-300 ${
-                  dueCountAnimation === 'subtract'
-                    ? 'scale-90 text-red-400'
-                    : ''
-                }`}
-              >
-                {dueCount}
-              </span>
-            </div>
-            <div>
-              <span className="text-gray-400">Total:</span>
-              <span className="ml-2 font-semibold text-white">
-                {totalCards}
-              </span>
-            </div>
-          </div>
+          <p className="mb-6 text-sm text-gray-400">{selectedDeck?.name}</p>
         </div>
 
         {error && (

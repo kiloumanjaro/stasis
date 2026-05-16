@@ -1,4 +1,4 @@
-import { getBackendBaseUrl } from '@/lib/backend-auth';
+import { getBackendBaseUrl, getBackendLogoutToken } from '@/lib/backend-auth';
 import type { OnboardingState } from '@/lib/frontend-store';
 
 export interface OnboardingStatusResponse {
@@ -49,11 +49,14 @@ export async function getOnboardingStatus(): Promise<OnboardingStatusResponse | 
 export async function completeOnboarding(
   data: CompleteOnboardingRequest
 ): Promise<CompleteOnboardingResponse> {
+  const csrfToken = await getBackendLogoutToken();
+
   const response = await fetch(`${getBackendBaseUrl()}/onboarding/complete`, {
     method: 'POST',
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
+      'x-csrf-token': csrfToken,
     },
     body: JSON.stringify(data),
   });
