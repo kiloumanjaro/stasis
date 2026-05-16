@@ -9,13 +9,15 @@ import { completeOnboarding, getOnboardingStatus } from '@/lib/onboarding';
 export type DefaultCardSort = 'due_date' | 'difficulty' | 'random';
 export type GazeSensitivity = 'low' | 'medium' | 'high';
 export type CompletionSound = 'none' | 'soft_chime' | 'bell';
+export type PrivacyComfort = 'visible' | 'hidden' | 'off';
+export type ExpressionTolerance = 'neutral' | 'intense' | 'variable';
 
 export interface SettingsProfile {
   id?: string;
   email?: string | null;
   display_name?: string | null;
-  privacy_comfort?: OnboardingState['privacy_comfort'] | null;
-  expression_tolerance?: OnboardingState['expression_tolerance'] | null;
+  privacy_comfort?: PrivacyComfort | null;
+  expression_tolerance?: ExpressionTolerance | null;
   study_block_length?: number | null;
   mini_breaks_per_session?: number | null;
   recovery_duration?: number | null;
@@ -458,7 +460,51 @@ export function clearFrontendAppState() {
     ONBOARDING_STORAGE_KEY,
     PREFERENCE_SUMMARY_STORAGE_KEY,
     FLASHCARD_STORAGE_KEY,
+    EMOTION_HISTORY_STORAGE_KEY,
   ].forEach((storageKey) => {
     window.localStorage.removeItem(storageKey);
   });
+}
+
+// ---------------------------------------------------------------------------
+// Emotion session history persistence
+// ---------------------------------------------------------------------------
+
+const EMOTION_HISTORY_STORAGE_KEY = 'stasis-emotion-history';
+
+export interface EmotionSessionEntry {
+  emotion: string;
+  confidence: number;
+  timestamp: number;
+}
+
+export interface EmotionSessionRecord {
+  sessionId: string;
+  startedAt: number;
+  endedAt: number;
+  entries: EmotionSessionEntry[];
+}
+
+interface EmotionHistoryStore {
+  sessions: EmotionSessionRecord[];
+}
+
+function getDefaultEmotionHistoryStore(): EmotionHistoryStore {
+  return { sessions: [] };
+}
+
+export function readEmotionHistory(): EmotionSessionRecord[] {
+  return readJson<EmotionHistoryStore>(
+    EMOTION_HISTORY_STORAGE_KEY,
+    getDefaultEmotionHistoryStore()
+  ).sessions;
+}
+
+export function saveEmotionSession(session: EmotionSessionRecord) {
+  const store = readJson<EmotionHistoryStore>(
+    EMOTION_HISTORY_STORAGE_KEY,
+    getDefaultEmotionHistoryStore()
+  );
+  store.sessions = [...store.sessions, session];
+  writeJson(EMOTION_HISTORY_STORAGE_KEY, store);
 }
