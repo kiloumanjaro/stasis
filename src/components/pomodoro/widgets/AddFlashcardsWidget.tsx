@@ -14,7 +14,6 @@ interface FlashcardEntry {
   answer: string;
   id?: string;
   backendId?: number;
-  source?: 'csv' | 'manual';
 }
 
 interface AddFlashcardsWidgetProps {
@@ -34,13 +33,11 @@ interface AddFlashcardsWidgetProps {
 export function AddFlashcardsWidget(props: AddFlashcardsWidgetProps) {
   const [deckTitle, setDeckTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [mode, setMode] = useState<'manual' | 'csv'>('manual');
   const [flashcards, setFlashcards] = useState<FlashcardEntry[]>([
     {
       question: '',
       answer: '',
       id: `${Date.now()}-${Math.random()}`,
-      source: 'manual',
     },
   ]);
   // If in edit mode and initial data provided, populate fields
@@ -53,7 +50,6 @@ export function AddFlashcardsWidget(props: AddFlashcardsWidgetProps) {
           props.initialFlashcards.map((f) => ({
             ...f,
             id: f.id || `${Date.now()}-${Math.random()}`,
-            source: (f.source as 'csv' | 'manual') ?? 'manual',
           }))
         );
       }
@@ -62,7 +58,6 @@ export function AddFlashcardsWidget(props: AddFlashcardsWidgetProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [submitted, setSubmitted] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const submittedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
@@ -97,7 +92,6 @@ export function AddFlashcardsWidget(props: AddFlashcardsWidgetProps) {
         question: '',
         answer: '',
         id: `${Date.now()}-${Math.random()}`,
-        source: 'manual',
       },
     ]);
   };
@@ -114,59 +108,6 @@ export function AddFlashcardsWidget(props: AddFlashcardsWidgetProps) {
     const updated = [...flashcards];
     updated[index][field] = value;
     setFlashcards(updated);
-  };
-
-  const parseCSV = (content: string): FlashcardEntry[] => {
-    const lines = content.trim().split('\n');
-    const entries: FlashcardEntry[] = [];
-
-    // Skip header row if it exists
-    const startIndex = lines[0].toLowerCase().includes('question') ? 1 : 0;
-
-    for (let i = startIndex; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line) continue;
-
-      // Simple CSV parsing (handles basic cases)
-      const parts = line.split(',').map((part) => part.trim());
-      if (parts.length >= 2) {
-        entries.push({
-          question: parts[0].replace(/^["']|["']$/g, ''), // Remove quotes
-          answer: parts[1].replace(/^["']|["']$/g, ''),
-        });
-      }
-    }
-
-    return entries;
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.name.endsWith('.csv')) {
-      setError('Please upload a CSV file');
-      return;
-    }
-
-    setError('');
-
-    // Parse CSV preview
-    const content = await file.text();
-    const parsed = parseCSV(content).map((p) => ({
-      ...p,
-      id: `${Date.now()}-${Math.random()}`,
-      source: 'csv' as const,
-    }));
-    if (parsed.length > 0) {
-      // Replace any previous CSV-sourced entries but keep manual entries
-      setFlashcards((prev) => {
-        const manual = prev.filter((f) => f.source !== 'csv');
-        return [...manual, ...parsed];
-      });
-    } else {
-      setError('No valid rows found in CSV.');
-    }
   };
 
   const handleSubmit = async () => {
@@ -195,7 +136,21 @@ export function AddFlashcardsWidget(props: AddFlashcardsWidgetProps) {
       const apiDeckId = props.initialDeck?.apiDeckId;
 
       if (props.edit && apiDeckId) {
-        // API deck edit: update/add/delete cards via backend
+        // API deck edit: update deck title/description + update/add/delete cards via backend
+        const updateFields: { name?: string; description?: string } = {};
+        if (deckTitle.trim() !== (props.initialDeck?.deckTitle ?? '')) {
+          updateFields.name = deckTitle.trim();
+        }
+        if (description.trim() !== (props.initialDeck?.description ?? '')) {
+          updateFields.description = description.trim();
+        }
+        if (
+          updateFields.name !== undefined ||
+          updateFields.description !== undefined
+        ) {
+          await fsrsClient.decks.update(apiDeckId, updateFields);
+        }
+
         const originalBackendIds = new Set(
           (props.initialFlashcards ?? [])
             .map((f) => f.backendId)
@@ -342,189 +297,60 @@ export function AddFlashcardsWidget(props: AddFlashcardsWidgetProps) {
           />
         </div>
 
-        <div className="flex justify-center gap-2">
-          <Button
-            variant="ghost"
-            onClick={() => setMode('manual')}
-            size="sm"
-            className={`flex items-center px-5 py-4 ${mode === 'manual' ? 'bg-accent' : ''}`}
-          >
-            Manual Entry
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={() => setMode('csv')}
-            size="sm"
-            className={`flex items-center px-5 py-4 ${mode === 'csv' ? 'bg-accent' : ''}`}
-          >
-            CSV Upload
-          </Button>
-        </div>
-
-        {mode === 'csv' ? (
-          <div>
-            <Label htmlFor="csvFile">Upload CSV File</Label>
-            <div className="flex items-center gap-2">
-              <Input
-                id="csvFile"
-                ref={fileInputRef}
-                type="file"
-                accept=".csv"
-                onChange={handleFileChange}
-                className="cursor-pointer"
-              />
-              {flashcards.some((f) => f.source === 'csv') && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => {
-                    // clear CSV-sourced entries
-                    setFlashcards((prev) =>
-                      prev.filter((f) => f.source !== 'csv')
-                    );
-                    if (fileInputRef.current) fileInputRef.current.value = '';
-                  }}
-                  title="Remove uploaded CSV"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Format: question,answer (one pair per line)
-            </p>
-
-            {flashcards.length > 0 ? (
-              <>
-                {flashcards.filter((f) => f.source === 'csv').length > 0 && (
-                  <p className="mt-2 text-sm text-green-600 dark:text-green-400">
-                    ✓ {flashcards.filter((f) => f.source === 'csv').length}{' '}
-                    flashcard(s) loaded — edit below or remove entries
-                  </p>
-                )}
-
-                <div className="mt-3 space-y-3">
-                  <Label>Flashcard(s) + from CSV</Label>
-                  {flashcards.map((card, index) => (
-                    <Card key={index} className="space-y-2 p-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">
-                          Card {index + 1}
-                        </span>
-                        <div className="flex gap-2">
-                          {flashcards.length > 1 && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRemoveCard(index)}
-                            >
-                              Remove
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                      <Input
-                        placeholder="Question"
-                        value={card.question}
-                        onChange={(e) =>
-                          handleCardChange(index, 'question', e.target.value)
-                        }
-                        aria-invalid={submitted && !card.question.trim()}
-                        className={
-                          submitted && !card.question.trim()
-                            ? 'border-red-500 ring-1 ring-red-500'
-                            : ''
-                        }
-                      />
-                      <Input
-                        placeholder="Answer"
-                        value={card.answer}
-                        onChange={(e) =>
-                          handleCardChange(index, 'answer', e.target.value)
-                        }
-                        aria-invalid={submitted && !card.answer.trim()}
-                        className={
-                          submitted && !card.answer.trim()
-                            ? 'border-red-500 ring-1 ring-red-500'
-                            : ''
-                        }
-                      />
-                    </Card>
-                  ))}
-
+        <div className="space-y-3">
+          <Label>Flashcard(s)</Label>
+          {flashcards.map((card, index) => (
+            <Card key={index} className="space-y-2 p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Card {index + 1}</span>
+                {flashcards.length > 1 && (
                   <Button
                     variant="ghost"
-                    onClick={handleAddCard}
-                    className="flex w-full items-center justify-center py-5"
                     size="sm"
+                    onClick={() => handleRemoveCard(index)}
                   >
-                    <Plus className="h-4 w-4" />
-                    Add Another Card
+                    Remove
                   </Button>
-                </div>
-              </>
-            ) : (
-              <p className="mt-2 text-sm text-muted-foreground">
-                No flashcards loaded yet.
-              </p>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <Label>Flashcard(s)</Label>
-            {flashcards.map((card, index) => (
-              <Card key={index} className="space-y-2 p-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Card {index + 1}</span>
-                  {flashcards.length > 1 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleRemoveCard(index)}
-                    >
-                      Remove
-                    </Button>
-                  )}
-                </div>
-                <Input
-                  placeholder="Question"
-                  value={card.question}
-                  onChange={(e) =>
-                    handleCardChange(index, 'question', e.target.value)
-                  }
-                  aria-invalid={submitted && !card.question.trim()}
-                  className={
-                    submitted && !card.question.trim()
-                      ? 'border-red-500 ring-1 ring-red-500'
-                      : ''
-                  }
-                />
-                <Input
-                  placeholder="Answer"
-                  value={card.answer}
-                  onChange={(e) =>
-                    handleCardChange(index, 'answer', e.target.value)
-                  }
-                  aria-invalid={submitted && !card.answer.trim()}
-                  className={
-                    submitted && !card.answer.trim()
-                      ? 'border-red-500 ring-1 ring-red-500'
-                      : ''
-                  }
-                />
-              </Card>
-            ))}
-            <Button
-              variant="ghost"
-              onClick={handleAddCard}
-              className="flex w-full items-center justify-center py-5"
-              size="sm"
-            >
-              <Plus className="h-4 w-4" />
-              Add Another Card
-            </Button>
-          </div>
-        )}
+                )}
+              </div>
+              <Input
+                placeholder="Question"
+                value={card.question}
+                onChange={(e) =>
+                  handleCardChange(index, 'question', e.target.value)
+                }
+                aria-invalid={submitted && !card.question.trim()}
+                className={
+                  submitted && !card.question.trim()
+                    ? 'border-red-500 ring-1 ring-red-500'
+                    : ''
+                }
+              />
+              <Input
+                placeholder="Answer"
+                value={card.answer}
+                onChange={(e) =>
+                  handleCardChange(index, 'answer', e.target.value)
+                }
+                aria-invalid={submitted && !card.answer.trim()}
+                className={
+                  submitted && !card.answer.trim()
+                    ? 'border-red-500 ring-1 ring-red-500'
+                    : ''
+                }
+              />
+            </Card>
+          ))}
+          <Button
+            variant="ghost"
+            onClick={handleAddCard}
+            className="flex w-full items-center justify-center py-5"
+            size="sm"
+          >
+            <Plus className="h-4 w-4" />
+            Add Another Card
+          </Button>
+        </div>
       </div>
 
       <div className="flex items-center gap-2 border-t pt-4">

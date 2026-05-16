@@ -6,6 +6,24 @@ export interface EmotionSocketFrame extends EmotionTransportSnapshot {
   sessionId: string;
 }
 
+export interface InterventionTrigger {
+  interventionId: string;
+  type: 'INTERVENTION';
+  action: 'MEME_RESET' | 'SHORT_BREAK' | 'LONG_BREAK';
+  duration: number;
+  reason: string;
+  dismissible: boolean;
+  sessionId: string;
+}
+
+export interface InterventionFeedback {
+  interventionId: string;
+  sessionId: string;
+  action: string;
+  outcome: 'dismissed' | 'completed' | 'extended';
+  timestamp: number;
+}
+
 let socket: Socket | null = null;
 
 function ensureSocket() {
@@ -59,6 +77,25 @@ export function emitEmotionFrame(frame: EmotionSocketFrame) {
     return false;
   }
 
-  currentSocket.emit('emotion:frame', frame);
+  // Backend expects 'timestamp'; transport snapshot uses 'client_ts'
+  currentSocket.emit('emotion:frame', {
+    sessionId: frame.sessionId,
+    timestamp: frame.client_ts,
+    emotion: frame.emotion,
+    gaze: frame.gaze,
+    confidence: frame.confidence ?? 1.0,
+  });
   return true;
+}
+
+export function onInterventionTrigger(cb: (t: InterventionTrigger) => void) {
+  ensureSocket()?.on('intervention:trigger', cb);
+}
+
+export function offInterventionTrigger(cb: (t: InterventionTrigger) => void) {
+  ensureSocket()?.off('intervention:trigger', cb);
+}
+
+export function emitInterventionFeedback(feedback: InterventionFeedback) {
+  ensureSocket()?.emit('intervention:feedback', feedback);
 }

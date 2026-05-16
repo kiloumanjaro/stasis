@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Footer } from '@/components/dashboard/Footer';
 import { createFlashcardDeck } from '@/lib/frontend-store';
 import { fsrsClient } from '@/lib/fsrs-client';
+import { useDecks } from '@/hooks/useDecks';
 import { toast } from 'sonner';
 import { SupportedFileTypes } from '@/components/upload/SupportedFileTypes';
 import { UploadHistorySection } from '@/components/upload/UploadHistorySection';
@@ -46,7 +47,16 @@ export function UploadContent() {
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [sortBy, setSortBy] = useState('Date Uploaded');
+  const [cardCount, setCardCount] = useState<number | string>(10);
+  const [deckTitle, setDeckTitle] = useState('');
+  const [deckDescription, setDeckDescription] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const { decks, fetchDecks } = useDecks();
+
+  useEffect(() => {
+    void fetchDecks();
+  }, [fetchDecks]);
 
   const handleFileSelect = (selectedFile: File) => {
     // Validate file type
@@ -144,11 +154,18 @@ export function UploadContent() {
 
     setUploading(true);
 
+    const parsedCount =
+      typeof cardCount === 'number' ? cardCount : parseInt(cardCount, 10);
+    const finalCount = isNaN(parsedCount) ? 10 : parsedCount;
+
     try {
       if (rawFile.type === 'application/pdf') {
         const formData = new FormData();
         formData.append('pdf', rawFile);
-        formData.append('cardCount', '10');
+        formData.append('cardCount', finalCount.toString());
+        if (deckTitle.trim()) formData.append('name', deckTitle.trim());
+        if (deckDescription.trim())
+          formData.append('description', deckDescription.trim());
         const result = await fsrsClient.decks.create(formData);
         toast.success(
           `Created deck "${result.deck.name}" with ${result.cards.length} AI-generated cards.`
@@ -162,20 +179,32 @@ export function UploadContent() {
         }
         const flashcards = buildFlashcardsFromText(
           uploadedFile.extractedText,
-          10
+          finalCount
         );
         if (flashcards.length === 0) {
           throw new Error('Could not derive any flashcards from this file');
         }
+        const finalTitle =
+          deckTitle.trim() || uploadedFile.fileName.replace(/\.[^/.]+$/, '');
+        const finalDesc =
+          deckDescription.trim() || `Generated from ${uploadedFile.fileName}`;
         const deck = createFlashcardDeck({
-          deckTitle: uploadedFile.fileName.replace(/\.[^/.]+$/, ''),
-          description: `Generated from ${uploadedFile.fileName}`,
+          deckTitle: finalTitle,
+          description: finalDesc,
           flashcards,
         });
         toast.success(
           `Saved ${flashcards.length} flashcards in deck "${deck.fc_name}".`
         );
       }
+      // Reset upload state after successful generation
+      setFile(null);
+      setRawFile(null);
+      setUploadedFile(null);
+      setDeckTitle('');
+      setDeckDescription('');
+      setCardCount(10);
+      void fetchDecks();
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : 'Failed to generate flashcards'
@@ -245,6 +274,20 @@ export function UploadContent() {
         onDrop={handleDrop}
         onFileChange={handleFileChange}
         onPrimaryAction={handlePrimaryAction}
+        onCancel={() => {
+          setFile(null);
+          setRawFile(null);
+          setUploadedFile(null);
+          setDeckTitle('');
+          setDeckDescription('');
+          setCardCount(10);
+        }}
+        cardCount={cardCount}
+        onCardCountChange={setCardCount}
+        deckTitle={deckTitle}
+        onDeckTitleChange={setDeckTitle}
+        deckDescription={deckDescription}
+        onDeckDescriptionChange={setDeckDescription}
       />
 
       <p className="text-sm text-muted-foreground">
@@ -253,7 +296,11 @@ export function UploadContent() {
       </p>
 
       <SupportedFileTypes />
-      <UploadHistorySection sortBy={sortBy} onSortChange={setSortBy} />
+      <UploadHistorySection
+        decks={decks}
+        sortBy={sortBy}
+        onSortChange={setSortBy}
+      />
 
       {/* TODO: integrate title/description into page content above */}
       {/*

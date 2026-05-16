@@ -6,6 +6,10 @@ import { Sidebar } from '@/components/app/Sidebar';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getBackendUser, type BackendAuthUser } from '@/lib/backend-auth';
+import {
+  readOnboardingState,
+  checkOnboardingStatusWithBackend,
+} from '@/lib/frontend-store';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<BackendAuthUser | null>(null);
@@ -28,6 +32,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           setLoading(false);
           router.replace('/auth/sign-up');
           return;
+        }
+
+        // Check backend for onboarding status first, fall back to localStorage
+        const backendCompleted = await checkOnboardingStatusWithBackend();
+        if (!backendCompleted) {
+          const localOnboarding = readOnboardingState();
+          if (!localOnboarding.completed) {
+            setUser(currentUser);
+            setLoading(false);
+            router.replace('/onboarding/welcome');
+            return;
+          }
         }
 
         setUser(currentUser);

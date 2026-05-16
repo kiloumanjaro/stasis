@@ -4,6 +4,7 @@ import {
   type Difficulty,
 } from '@/components/pomodoro/spacedRepetition';
 import type { AdaptiveStudyParameters } from '@/types/preferences';
+import { completeOnboarding, getOnboardingStatus } from '@/lib/onboarding';
 import {
   DEFAULT_RUNTIME_PREFERENCES,
   normalizeRuntimePreferences,
@@ -12,6 +13,8 @@ import {
   type PrivacyComfort,
   type UserPreferences,
 } from '@/types/runtime-preferences';
+
+export type { PrivacyComfort, ExpressionTolerance };
 
 export type DefaultCardSort = 'due_date' | 'difficulty' | 'random';
 export type GazeSensitivity = 'low' | 'medium' | 'high';
@@ -45,17 +48,13 @@ export interface SettingsProfile {
 }
 
 export interface OnboardingState {
-  focusGoalMinutes: number;
-  breakDurationMinutes: number;
-  dailyGoalCards: number;
-  cvMonitoringEnabled: boolean;
-  privacyComfort: PrivacyComfort;
-  expressionTolerance: ExpressionTolerance;
-  studyBlockLength: number;
-  miniBreaksPerSession: number;
-  breakMechanic: BreakMechanic;
-  recoveryDuration: number;
-  showTimer: boolean;
+  privacy_comfort: PrivacyComfort;
+  expression_tolerance: ExpressionTolerance;
+  study_block_length: number;
+  mini_breaks_per_session: number;
+  break_mechanic: BreakMechanic;
+  recovery_duration: number;
+  show_timer: boolean;
   completed: boolean;
   skipped: boolean;
 }
@@ -118,17 +117,13 @@ export const DEFAULT_SETTINGS_PROFILE: SettingsProfile = {
 };
 
 export const DEFAULT_ONBOARDING_STATE: OnboardingState = {
-  focusGoalMinutes: 25,
-  breakDurationMinutes: 5,
-  dailyGoalCards: 20,
-  cvMonitoringEnabled: false,
-  privacyComfort: DEFAULT_RUNTIME_PREFERENCES.privacy_comfort,
-  expressionTolerance: DEFAULT_RUNTIME_PREFERENCES.expression_tolerance,
-  studyBlockLength: DEFAULT_RUNTIME_PREFERENCES.study_block_length,
-  miniBreaksPerSession: DEFAULT_RUNTIME_PREFERENCES.mini_breaks_per_session,
-  breakMechanic: DEFAULT_RUNTIME_PREFERENCES.break_mechanic,
-  recoveryDuration: DEFAULT_RUNTIME_PREFERENCES.recovery_duration,
-  showTimer: DEFAULT_RUNTIME_PREFERENCES.show_timer,
+  privacy_comfort: DEFAULT_RUNTIME_PREFERENCES.privacy_comfort,
+  expression_tolerance: DEFAULT_RUNTIME_PREFERENCES.expression_tolerance,
+  study_block_length: DEFAULT_RUNTIME_PREFERENCES.study_block_length,
+  mini_breaks_per_session: DEFAULT_RUNTIME_PREFERENCES.mini_breaks_per_session,
+  break_mechanic: DEFAULT_RUNTIME_PREFERENCES.break_mechanic,
+  recovery_duration: DEFAULT_RUNTIME_PREFERENCES.recovery_duration,
+  show_timer: DEFAULT_RUNTIME_PREFERENCES.show_timer,
   completed: false,
   skipped: false,
 };
@@ -216,41 +211,41 @@ export function runtimePreferencesFromOnboardingState(
   onboarding = readOnboardingState()
 ): UserPreferences {
   return normalizeRuntimePreferences({
-    privacy_comfort: onboarding.privacyComfort,
-    expression_tolerance: onboarding.expressionTolerance,
-    study_block_length: onboarding.studyBlockLength,
-    mini_breaks_per_session: onboarding.miniBreaksPerSession,
-    break_mechanic: onboarding.breakMechanic,
-    recovery_duration: onboarding.recoveryDuration,
-    show_timer: onboarding.showTimer,
+    privacy_comfort: onboarding.privacy_comfort,
+    expression_tolerance: onboarding.expression_tolerance,
+    study_block_length: onboarding.study_block_length,
+    mini_breaks_per_session: onboarding.mini_breaks_per_session,
+    break_mechanic: onboarding.break_mechanic,
+    recovery_duration: onboarding.recovery_duration,
+    show_timer: onboarding.show_timer,
   });
 }
 
 export function readRuntimePreferencesFromLocalState(): UserPreferences {
   const storedSettings = readStoredSettingsPatch();
   const onboarding = readOnboardingState();
-  const legacyPrivacyComfort =
-    (storedSettings.cv_monitoring_enabled ?? onboarding.cvMonitoringEnabled)
-      ? 'hidden'
-      : 'off';
+  const localCameraEnabled =
+    storedSettings.cv_monitoring_enabled ??
+    onboarding.privacy_comfort !== 'off';
+  const legacyPrivacyComfort = localCameraEnabled ? 'hidden' : 'off';
 
   return normalizeRuntimePreferences({
     privacy_comfort: storedSettings.privacy_comfort ?? legacyPrivacyComfort,
     expression_tolerance:
-      storedSettings.expression_tolerance ?? onboarding.expressionTolerance,
+      storedSettings.expression_tolerance ?? onboarding.expression_tolerance,
     study_block_length:
       storedSettings.study_block_length ??
       storedSettings.focus_goal_minutes ??
-      onboarding.studyBlockLength ??
-      onboarding.focusGoalMinutes,
+      onboarding.study_block_length,
     mini_breaks_per_session:
-      storedSettings.mini_breaks_per_session ?? onboarding.miniBreaksPerSession,
-    break_mechanic: storedSettings.break_mechanic ?? onboarding.breakMechanic,
+      storedSettings.mini_breaks_per_session ??
+      onboarding.mini_breaks_per_session,
+    break_mechanic: storedSettings.break_mechanic ?? onboarding.break_mechanic,
     recovery_duration:
       storedSettings.recovery_duration ??
       storedSettings.burnout_threshold_minutes ??
-      onboarding.recoveryDuration,
-    show_timer: storedSettings.show_timer ?? onboarding.showTimer,
+      onboarding.recovery_duration,
+    show_timer: storedSettings.show_timer ?? onboarding.show_timer,
   });
 }
 
@@ -291,21 +286,46 @@ export function saveOnboardingState(patch: Partial<OnboardingState>) {
   return nextState;
 }
 
-export function markOnboardingComplete() {
+export async function markOnboardingComplete(
+  patch: Partial<OnboardingState> = {}
+) {
   const onboarding = saveOnboardingState({
+    ...patch,
     completed: true,
   });
   const runtimePreferences = runtimePreferencesFromOnboardingState(onboarding);
 
+  try {
+    await completeOnboarding({
+      privacy_comfort: onboarding.privacy_comfort,
+      expression_tolerance: onboarding.expression_tolerance,
+      study_block_length: onboarding.study_block_length,
+      mini_breaks_per_session: onboarding.mini_breaks_per_session,
+      recovery_duration: onboarding.recovery_duration,
+      break_mechanic: onboarding.break_mechanic,
+      show_timer: onboarding.show_timer,
+    });
+  } catch (error) {
+    console.error('Failed to complete onboarding on backend:', error);
+  }
+
   saveSettingsProfile({
-    focus_goal_minutes: onboarding.focusGoalMinutes,
-    break_duration_minutes: onboarding.breakDurationMinutes,
-    daily_goal_cards: onboarding.dailyGoalCards,
-    cv_monitoring_enabled: onboarding.cvMonitoringEnabled,
+    focus_goal_minutes: onboarding.study_block_length,
+    break_duration_minutes: onboarding.recovery_duration,
+    cv_monitoring_enabled: onboarding.privacy_comfort !== 'off',
     ...getSettingsPatchForRuntimePreferences(runtimePreferences),
   });
 
   return onboarding;
+}
+
+export async function checkOnboardingStatusWithBackend(): Promise<boolean> {
+  const status = await getOnboardingStatus();
+  if (status?.onboarding_completed) {
+    saveOnboardingState({ completed: true });
+    return true;
+  }
+  return false;
 }
 
 export function readSettingsProfile(): SettingsProfile {
@@ -516,7 +536,51 @@ export function clearFrontendAppState() {
     ONBOARDING_STORAGE_KEY,
     PREFERENCE_SUMMARY_STORAGE_KEY,
     FLASHCARD_STORAGE_KEY,
+    EMOTION_HISTORY_STORAGE_KEY,
   ].forEach((storageKey) => {
     window.localStorage.removeItem(storageKey);
   });
+}
+
+// ---------------------------------------------------------------------------
+// Emotion session history persistence
+// ---------------------------------------------------------------------------
+
+const EMOTION_HISTORY_STORAGE_KEY = 'stasis-emotion-history';
+
+export interface EmotionSessionEntry {
+  emotion: string;
+  confidence: number;
+  timestamp: number;
+}
+
+export interface EmotionSessionRecord {
+  sessionId: string;
+  startedAt: number;
+  endedAt: number;
+  entries: EmotionSessionEntry[];
+}
+
+interface EmotionHistoryStore {
+  sessions: EmotionSessionRecord[];
+}
+
+function getDefaultEmotionHistoryStore(): EmotionHistoryStore {
+  return { sessions: [] };
+}
+
+export function readEmotionHistory(): EmotionSessionRecord[] {
+  return readJson<EmotionHistoryStore>(
+    EMOTION_HISTORY_STORAGE_KEY,
+    getDefaultEmotionHistoryStore()
+  ).sessions;
+}
+
+export function saveEmotionSession(session: EmotionSessionRecord) {
+  const store = readJson<EmotionHistoryStore>(
+    EMOTION_HISTORY_STORAGE_KEY,
+    getDefaultEmotionHistoryStore()
+  );
+  store.sessions = [...store.sessions, session];
+  writeJson(EMOTION_HISTORY_STORAGE_KEY, store);
 }

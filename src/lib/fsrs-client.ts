@@ -28,6 +28,14 @@ export const fsrsClient = {
     create: (formData: FormData): Promise<{ deck: Deck; cards: Card[] }> =>
       request('/decks', { method: 'POST', body: formData }),
     get: (id: number): Promise<Deck> => request(`/decks/${id}`),
+    update: (
+      id: number,
+      fields: { name?: string; description?: string }
+    ): Promise<Deck> =>
+      request(`/decks/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(fields),
+      }),
     delete: (id: number): Promise<void> =>
       request(`/decks/${id}`, { method: 'DELETE' }),
   },

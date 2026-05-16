@@ -4,14 +4,9 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { BookOpen, Timer, Smile } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { useState } from 'react';
-import {
-  markOnboardingComplete,
-  saveRuntimePreferencesToLocalProfile,
-  saveOnboardingState,
-} from '@/lib/frontend-store';
-import { completeRuntimeOnboarding } from '@/lib/preferences-client';
-import { DEFAULT_RUNTIME_PREFERENCES } from '@/types/runtime-preferences';
+import { markOnboardingComplete } from '@/lib/frontend-store';
 
 const FEATURES = [
   { icon: BookOpen, label: 'AI Flashcards' },
@@ -25,40 +20,19 @@ export default function WelcomePage() {
 
   const handleSkip = async () => {
     setSkipping(true);
-    const skipPreferences = DEFAULT_RUNTIME_PREFERENCES;
-
-    saveOnboardingState({
-      skipped: true,
-      cvMonitoringEnabled: false,
-      privacyComfort: skipPreferences.privacy_comfort,
-      expressionTolerance: skipPreferences.expression_tolerance,
-      studyBlockLength: skipPreferences.study_block_length,
-      miniBreaksPerSession: skipPreferences.mini_breaks_per_session,
-      breakMechanic: skipPreferences.break_mechanic,
-      recoveryDuration: skipPreferences.recovery_duration,
-      showTimer: skipPreferences.show_timer,
-    });
-    saveRuntimePreferencesToLocalProfile(skipPreferences);
-
     try {
-      const response = await completeRuntimeOnboarding(skipPreferences);
-      saveRuntimePreferencesToLocalProfile(response.preferences);
-    } catch {
-      console.warn(
-        'Skipped onboarding with local preferences until backend preferences are available.'
-      );
+      await markOnboardingComplete({ skipped: true });
+      router.push('/dashboard');
+    } catch (error) {
+      console.error('Error skipping onboarding:', error);
+      setSkipping(false);
     }
-
-    markOnboardingComplete();
-    router.push('/dashboard');
   };
 
   return (
     <div className="flex min-h-screen items-center justify-center">
       <div className="flex w-full max-w-[520px] flex-col items-center gap-8 px-6 text-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-[10px] bg-[#2D2860]">
-          <Image src="/images/icon.png" alt="Stasis" width={36} height={36} />
-        </div>
+        <Image src="/images/stasis.png" alt="Stasis" width={80} height={80} />
 
         <div className="space-y-3">
           <h1 className="text-[32px] font-bold leading-tight text-[#EAEAF0]">
@@ -71,21 +45,20 @@ export default function WelcomePage() {
 
         <div className="flex flex-wrap items-center justify-center gap-2">
           {FEATURES.map(({ icon: Icon, label }) => (
-            <div
+            <Badge
               key={label}
-              className="flex items-center gap-1.5 rounded-full border border-[#2A2A35] bg-[#131316] px-3.5 py-1.5"
+              variant="outline"
+              className="flex items-center gap-1.5 rounded-full border-[#2A2A35] bg-[#131316] px-3.5 py-1.5 text-[#9090A8]"
             >
-              <Icon className="h-3.5 w-3.5 text-[#9090A8]" />
-              <span className="text-[13px] font-medium text-[#9090A8]">
-                {label}
-              </span>
-            </div>
+              <Icon className="h-3.5 w-3.5" />
+              <span className="text-[13px] font-medium">{label}</span>
+            </Badge>
           ))}
         </div>
 
         <div className="flex w-full max-w-[320px] flex-col items-center gap-3">
           <Button
-            onClick={() => router.push('/onboarding/preferences')}
+            onClick={() => router.push('/onboarding/setup')}
             className="w-full"
           >
             Get Started
