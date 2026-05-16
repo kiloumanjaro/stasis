@@ -14,6 +14,7 @@ import {
   WidgetToggleBar,
 } from './widgets';
 import { useCameraContextSafe } from '@/features/camera/context/CameraContext';
+import { InterventionLayer } from '@/features/intervention/InterventionLayer';
 
 const WIDGET_WIDTH = Math.round(320 * 0.85); // 272 — 85% of original timer width
 const CAMERA_WIDGET_HEIGHT = 280; // estimated rendered height incl. header
@@ -166,6 +167,7 @@ export function PomodoroContent({
 
   return (
     <div className="relative flex h-full min-h-[calc(100vh-8rem)] flex-col">
+      <InterventionLayer />
       {/* Header */}
       <div className="relative mb-8">
         <h1 className="text-2xl">Pomodoro Timer</h1>

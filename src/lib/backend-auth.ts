@@ -55,10 +55,15 @@ export function normalizeBackendUser(
 }
 
 export async function getBackendAuthUrl() {
-  const response = await fetch(`${getBackendBaseUrl()}/auth/google/url`, {
-    cache: 'no-store',
-    credentials: 'include',
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${getBackendBaseUrl()}/auth/google/url`, {
+      cache: 'no-store',
+      credentials: 'include',
+    });
+  } catch {
+    throw new Error('Backend unreachable — cannot start auth flow');
+  }
 
   if (!response.ok) {
     throw new Error('Failed to start backend auth flow');
@@ -80,11 +85,17 @@ export async function getBackendUser(cookieHeader?: string) {
     headers.set('Cookie', cookieHeader);
   }
 
-  const response = await fetch(`${getBackendBaseUrl()}/auth/google/verify`, {
-    cache: 'no-store',
-    credentials: cookieHeader ? 'same-origin' : 'include',
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${getBackendBaseUrl()}/auth/google/verify`, {
+      cache: 'no-store',
+      credentials: cookieHeader ? 'same-origin' : 'include',
+      headers,
+    });
+  } catch {
+    // Backend unreachable — treat as unauthenticated
+    return null;
+  }
 
   if (!response.ok) {
     return null;
@@ -153,11 +164,16 @@ export async function getBackendLogoutContext(
     headers.set('Cookie', cookieHeader);
   }
 
-  const response = await fetch(`${getBackendBaseUrl()}/auth/csrf`, {
-    cache: 'no-store',
-    credentials: cookieHeader ? 'same-origin' : 'include',
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${getBackendBaseUrl()}/auth/csrf`, {
+      cache: 'no-store',
+      credentials: cookieHeader ? 'same-origin' : 'include',
+      headers,
+    });
+  } catch {
+    throw new Error('Backend unreachable — cannot create CSRF token');
+  }
 
   if (!response.ok) {
     throw new Error('Failed to create CSRF token for backend logout');
