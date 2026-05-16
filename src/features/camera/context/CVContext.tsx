@@ -21,6 +21,7 @@ import {
   emitEmotionFrame,
   getEmotionSocket,
 } from '@/lib/emotion-socket';
+import { saveEmotionSession } from '@/lib/frontend-store';
 import { useFaceApiCV } from '../hooks/useFaceApiCV';
 import { useCameraContextSafe } from './CameraContext';
 import type {
@@ -132,6 +133,7 @@ export function CVProvider({ children }: CVProviderProps) {
   const flushIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const backoffUntilRef = useRef(0);
   const lastSampleAtRef = useRef(0);
+  const localCaptureStartRef = useRef(0);
   const sessionSummaryRef = useRef<{
     totalSnapshots: number;
     confusionCount: number;
@@ -201,21 +203,33 @@ export function CVProvider({ children }: CVProviderProps) {
           setRecordingStateSafe(previousState);
         }
       } catch (flushError) {
-        if (
+        // Silently ignore auth / network errors (same as session start).
+        const isAuthFlush =
           flushError instanceof EmotionApiError &&
-          flushError.status === 429
-        ) {
-          backoffUntilRef.current =
-            Date.now() +
-            (flushError.retryAfterMs ?? RECORDING_CONFIG.defaultBackoffMs);
-        }
+          (flushError.status === 401 || flushError.status === 403);
+        const isNetFlush =
+          flushError instanceof TypeError &&
+          /fetch|network/i.test(flushError.message);
 
-        setSyncError(
-          flushError instanceof Error
-            ? flushError.message
-            : 'Failed to sync emotion snapshots.'
-        );
-        setRecordingStateSafe('error');
+        if (isAuthFlush || isNetFlush) {
+          setRecordingStateSafe(previousState);
+        } else {
+          if (
+            flushError instanceof EmotionApiError &&
+            flushError.status === 429
+          ) {
+            backoffUntilRef.current =
+              Date.now() +
+              (flushError.retryAfterMs ?? RECORDING_CONFIG.defaultBackoffMs);
+          }
+
+          setSyncError(
+            flushError instanceof Error
+              ? flushError.message
+              : 'Failed to sync emotion snapshots.'
+          );
+          setRecordingStateSafe('error');
+        }
       } finally {
         flushInFlightRef.current = null;
       }
@@ -268,6 +282,23 @@ export function CVProvider({ children }: CVProviderProps) {
         requestedRecordingRef.current = false;
         activeSessionIdRef.current = null;
         setSessionId(null);
+
+        // Silently swallow auth / network errors from the backend.
+        // Local face detection and the trend-analysis chart still work
+        // without a backend session — no need to scare the user with a
+        // red error banner when the backend simply isn't set up yet.
+        const isAuthError =
+          startError instanceof EmotionApiError &&
+          (startError.status === 401 || startError.status === 403);
+        const isNetworkError =
+          startError instanceof TypeError &&
+          /fetch|network/i.test(startError.message);
+
+        if (isAuthError || isNetworkError) {
+          setRecordingStateSafe('idle');
+          return null;
+        }
+
         setSyncError(
           startError instanceof Error
             ? startError.message
@@ -300,11 +331,6 @@ export function CVProvider({ children }: CVProviderProps) {
           disconnectEmotionSocket();
           setQueue([]);
           setSessionId(null);
-          setSyncError((currentError) =>
-            reason === 'camera-stop' && !currentError
-              ? 'Emotion recording stopped because the camera became unavailable.'
-              : currentError
-          );
           setRecordingStateSafe('idle');
           return;
         }
@@ -323,12 +349,23 @@ export function CVProvider({ children }: CVProviderProps) {
           setSyncError(null);
           setRecordingStateSafe('idle');
         } catch (endError) {
-          setSyncError(
-            endError instanceof Error
-              ? endError.message
-              : 'Failed to finish emotion recording.'
-          );
-          setRecordingStateSafe('error');
+          const isAuthEnd =
+            endError instanceof EmotionApiError &&
+            (endError.status === 401 || endError.status === 403);
+          const isNetEnd =
+            endError instanceof TypeError &&
+            /fetch|network/i.test(endError.message);
+
+          if (!isAuthEnd && !isNetEnd) {
+            setSyncError(
+              endError instanceof Error
+                ? endError.message
+                : 'Failed to finish emotion recording.'
+            );
+            setRecordingStateSafe('error');
+          } else {
+            setRecordingStateSafe('idle');
+          }
         } finally {
           disconnectEmotionSocket();
           activeSessionIdRef.current = null;
@@ -458,6 +495,36 @@ export function CVProvider({ children }: CVProviderProps) {
       ...transportSnapshot,
     });
   }, [latestCVData, setQueue]);
+
+  // Persist emotion history to localStorage when local capture ends so
+  // the data appears in Emotion History & Session Timelines on the /cv page.
+  useEffect(() => {
+    if (isCapturing) {
+      // Camera just became active — mark session start
+      localCaptureStartRef.current = Date.now();
+    } else if (localCaptureStartRef.current > 0) {
+      // Camera just stopped — save entries collected during this session
+      const sessionStart = localCaptureStartRef.current;
+      const sessionEntries = historyRef.current
+        .filter((s) => s.timestamp >= sessionStart)
+        .map((s) => ({
+          emotion: s.emotion,
+          confidence: s.confidence ?? 0,
+          timestamp: s.timestamp,
+        }));
+
+      if (sessionEntries.length > 0) {
+        saveEmotionSession({
+          sessionId: `focus-${sessionStart}`,
+          startedAt: sessionStart,
+          endedAt: Date.now(),
+          entries: sessionEntries,
+        });
+      }
+
+      localCaptureStartRef.current = 0;
+    }
+  }, [isCapturing]);
 
   useEffect(() => {
     if (
